@@ -146,8 +146,10 @@ export default [
       ['==', 'meta', 'midpoint'],
     ],
     'paint': {
-      'circle-radius': 3,
+      'circle-radius': 5,
       'circle-color': orange,
+      'circle-stroke-color': white,
+      'circle-stroke-width': 1,
     },
   },
   // Snap point

@@ -29,6 +29,9 @@ import {
   showDistanceAngleUI,
   hideDistanceAngleUI,
   removeDistanceAngleUI,
+  hideAngleSection,
+  showAngleSection,
+  setDistanceLabel,
 } from "../lib/angle_distance_input.js";
 import {
   DRAWING_SUB_MODES,
@@ -104,10 +107,19 @@ DrawPolygonDistance.onSetup = function (opts) {
     lineOffsetSide: null, // 'left' or 'right' based on mouse position
   };
 
-  createDrawingModeSelector(this._ctx, state);
   this.createDistanceInput(state);
   this.createAngleInput(state);
   this.createSnappingIndicator(state);
+
+  createDrawingModeSelector(this._ctx, state, {
+    onModeChange: (newMode) => {
+      if (newMode === DRAWING_SUB_MODES.LINE || newMode === DRAWING_SUB_MODES.RECTANGLE) {
+        hideAngleSection(state);
+      } else {
+        showAngleSection(state);
+      }
+    }
+  });
 
   // Hide distance/angle UI initially - it shows when drawing starts
   hideDistanceAngleUI(state);
@@ -1442,6 +1454,11 @@ DrawPolygonDistance.clickOnMap = function (state, e) {
       newVertex[1],
     );
 
+    // Change label to "Width" when entering RECTANGLE mode's width phase
+    if (state.drawingSubMode === DRAWING_SUB_MODES.RECTANGLE && state.vertices.length === 2) {
+      setDistanceLabel(state, 'Width', 'L');
+    }
+
     // Store snapped line info if snapped to a line
     const snappedCoord = { lng: newVertex[0], lat: newVertex[1] };
     const snappedLineInfo = getSnappedLineBearing(this._ctx, snappedCoord);
@@ -1520,6 +1537,11 @@ DrawPolygonDistance.clickOnMap = function (state, e) {
     );
     state.snappedLineBearing = null;
     state.snappedLineSegment = null;
+
+    // Change label to "Width" when entering RECTANGLE mode's width phase
+    if (state.drawingSubMode === DRAWING_SUB_MODES.RECTANGLE && state.vertices.length === 2) {
+      setDistanceLabel(state, 'Width', 'L');
+    }
 
     // Clear distance and angle inputs for next segment
     if (state.distanceInput) {
@@ -2078,6 +2100,11 @@ DrawPolygonDistance.clickOnMap = function (state, e) {
     newVertex[0],
     newVertex[1],
   );
+
+  // Change label to "Width" when entering RECTANGLE mode's width phase
+  if (state.drawingSubMode === DRAWING_SUB_MODES.RECTANGLE && state.vertices.length === 2) {
+    setDistanceLabel(state, 'Width', 'L');
+  }
 
   // Store snapped line info if snapped to a line
   const snappedCoord = this._ctx.snapping.snapCoord(e.lngLat);
@@ -3958,6 +3985,8 @@ DrawPolygonDistance.onKeyUp = function (state, e) {
       state.linePhase = 'drawing';
       this.removeDistanceLabel(state);
       this.removeGuideCircle(state);
+      // Reset label back to "Length" when exiting offset phase
+      setDistanceLabel(state, 'Length', 'L');
       // Reset polygon to line preview
       const coords = [...state.vertices, state.vertices[0]];
       state.polygon.setCoordinates([coords]);
@@ -3991,11 +4020,16 @@ DrawPolygonDistance.onKeyUp = function (state, e) {
     }
 
     if (state.vertices.length > 1) {
+      const wasInRectangleWidthPhase = state.drawingSubMode === DRAWING_SUB_MODES.RECTANGLE && state.vertices.length === 2;
       state.vertices.pop();
       // In rectangle mode, reset polygon to just the remaining vertices
       if (state.drawingSubMode === DRAWING_SUB_MODES.RECTANGLE) {
         const coords = [...state.vertices, state.vertices[0]];
         state.polygon.setCoordinates([coords]);
+        // Reset label back to "Length" when exiting RECTANGLE mode's width phase
+        if (wasInRectangleWidthPhase) {
+          setDistanceLabel(state, 'Length', 'L');
+        }
       } else {
         state.polygon.removeCoordinate(`0.${state.vertices.length}`);
       }
@@ -4138,6 +4172,9 @@ DrawPolygonDistance.enterLineOffsetPhase = function (state) {
     state.currentAngle = null;
     if (state.angleUpdateDisplay) state.angleUpdateDisplay();
   }
+
+  // Change label from "Length" to "Width" for offset phase
+  setDistanceLabel(state, 'Width', 'L');
 
   this.removePreviewPoint(state);
   this.removeRightAngleIndicator(state);

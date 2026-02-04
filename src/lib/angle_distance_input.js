@@ -376,6 +376,52 @@ export function showDistanceAngleUI(state) {
 }
 
 /**
+ * Hide the angle input section (used in Line/Rect sub-modes where angle doesn't apply)
+ * @param {Object} state - The mode state
+ */
+export function hideAngleSection(state) {
+  if (state.angleSection) {
+    state.angleSection.style.display = 'none';
+  }
+  if (state.angleSeparator) {
+    state.angleSeparator.style.display = 'none';
+  }
+  if (state.angleInput) {
+    state.angleInput.value = '';
+    state.currentAngle = null;
+    if (state.angleUpdateDisplay) state.angleUpdateDisplay();
+  }
+}
+
+/**
+ * Show the angle input section (used in Free sub-mode)
+ * @param {Object} state - The mode state
+ */
+export function showAngleSection(state) {
+  if (state.angleSection) {
+    state.angleSection.style.display = '';
+  }
+  if (state.angleSeparator) {
+    state.angleSeparator.style.display = '';
+  }
+}
+
+/**
+ * Update the distance input label text
+ * @param {Object} state - The mode state
+ * @param {string} labelText - The new label text (e.g., "Length" or "Width")
+ * @param {string} [keyText='L'] - The keyboard shortcut key to display
+ */
+export function setDistanceLabel(state, labelText, keyText = 'L') {
+  if (state.distanceSection) {
+    const label = state.distanceSection.querySelector('.mapbox-gl-draw-label');
+    if (label) {
+      label.innerHTML = `<span class="key">${keyText}</span><span class="text">${labelText}</span>`;
+    }
+  }
+}
+
+/**
  * Hide the distance/angle input UI and clear values
  * @param {Object} state - The mode state
  */

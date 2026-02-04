@@ -5,14 +5,22 @@ export const DRAWING_SUB_MODES = {
 };
 
 const SUB_MODE_LABELS = {
-  [DRAWING_SUB_MODES.FREE]: 'Free',
+  [DRAWING_SUB_MODES.FREE]: 'Freeform',
   [DRAWING_SUB_MODES.RECTANGLE]: 'Rect',
   [DRAWING_SUB_MODES.LINE]: 'Line',
 };
 
 const SUB_MODE_ORDER = [DRAWING_SUB_MODES.FREE, DRAWING_SUB_MODES.RECTANGLE, DRAWING_SUB_MODES.LINE];
 
-export function createDrawingModeSelector(ctx, state) {
+/**
+ * @param {Object} ctx - The draw context
+ * @param {Object} state - The mode state
+ * @param {Object} [options] - Configuration options
+ * @param {Function} [options.onModeChange] - Callback called when sub-mode changes, receives new mode
+ */
+export function createDrawingModeSelector(ctx, state, options = {}) {
+  const { onModeChange = null } = options;
+
   if (!ctx.options.useAngleDistanceInput) {
     return null;
   }
@@ -37,6 +45,7 @@ export function createDrawingModeSelector(ctx, state) {
 
   const modeLabel = document.createElement('span');
   modeLabel.className = 'mapbox-gl-draw-mode-selector-label';
+  modeLabel.style.cursor = 'pointer';
   modeLabel.textContent = SUB_MODE_LABELS[state.drawingSubMode];
   container.appendChild(modeLabel);
 
@@ -56,15 +65,36 @@ export function createDrawingModeSelector(ctx, state) {
       state.drawingSubMode = SUB_MODE_ORDER[(currentIndex + 1) % SUB_MODE_ORDER.length];
       ctx.lastDrawingSubMode = state.drawingSubMode;
       updateLabel();
+      if (onModeChange) {
+        onModeChange(state.drawingSubMode);
+      }
     }
   };
   document.addEventListener('keydown', keyHandler);
 
+  const clickHandler = () => {
+    if (state.vertices && state.vertices.length > 0) return;
+    const currentIndex = SUB_MODE_ORDER.indexOf(state.drawingSubMode);
+    state.drawingSubMode = SUB_MODE_ORDER[(currentIndex + 1) % SUB_MODE_ORDER.length];
+    ctx.lastDrawingSubMode = state.drawingSubMode;
+    updateLabel();
+    if (onModeChange) {
+      onModeChange(state.drawingSubMode);
+    }
+  };
+  modeLabel.addEventListener('click', clickHandler);
+
   state.modeSelectorContainer = container;
   state.modeSelectorKeyHandler = keyHandler;
+  state.modeSelectorClickHandler = clickHandler;
   state.modeSelectorLabel = modeLabel;
 
-  return { container, modeLabel, keyHandler };
+  // Call the callback with initial mode
+  if (onModeChange) {
+    onModeChange(state.drawingSubMode);
+  }
+
+  return { container, modeLabel, keyHandler, clickHandler };
 }
 
 export function hideDrawingModeSelector(state) {
@@ -83,6 +113,10 @@ export function removeDrawingModeSelector(state) {
   if (state.modeSelectorKeyHandler) {
     document.removeEventListener('keydown', state.modeSelectorKeyHandler);
     state.modeSelectorKeyHandler = null;
+  }
+  if (state.modeSelectorClickHandler && state.modeSelectorLabel) {
+    state.modeSelectorLabel.removeEventListener('click', state.modeSelectorClickHandler);
+    state.modeSelectorClickHandler = null;
   }
   if (state.modeSelectorContainer && state.modeSelectorContainer.parentNode) {
     state.modeSelectorContainer.parentNode.removeChild(state.modeSelectorContainer);
