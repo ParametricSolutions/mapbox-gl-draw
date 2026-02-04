@@ -29,7 +29,7 @@ export function createDrawingModeSelector(ctx, state, options = {}) {
   state.drawingSubMode = ctx.lastDrawingSubMode || DRAWING_SUB_MODES.FREE;
 
   const container = document.createElement('div');
-  container.className = 'mapbox-gl-draw-mode-selector-container';
+  container.className = 'mapbox-gl-draw-angle-distance-container';
 
   const [leftPos, topPos] = ctx.options.angleDistanceInputPosition;
   container.style.cssText = `
@@ -38,21 +38,21 @@ export function createDrawingModeSelector(ctx, state, options = {}) {
     left: ${leftPos};
   `;
 
-  const mKeyBadge = document.createElement('span');
-  mKeyBadge.className = 'mapbox-gl-draw-mode-selector-key';
-  mKeyBadge.textContent = 'M';
-  container.appendChild(mKeyBadge);
+  const section = document.createElement('div');
+  section.className = 'mapbox-gl-draw-section';
 
   const modeLabel = document.createElement('span');
-  modeLabel.className = 'mapbox-gl-draw-mode-selector-label';
+  modeLabel.className = 'mapbox-gl-draw-label';
   modeLabel.style.cursor = 'pointer';
-  modeLabel.textContent = SUB_MODE_LABELS[state.drawingSubMode];
-  container.appendChild(modeLabel);
+  modeLabel.innerHTML = `<span class="key">M</span><span class="text">${SUB_MODE_LABELS[state.drawingSubMode]}</span>`;
+
+  section.appendChild(modeLabel);
+  container.appendChild(section);
 
   ctx.map.getContainer().appendChild(container);
 
   const updateLabel = () => {
-    modeLabel.textContent = SUB_MODE_LABELS[state.drawingSubMode];
+    modeLabel.innerHTML = `<span class="key">M</span><span class="text">${SUB_MODE_LABELS[state.drawingSubMode]}</span>`;
   };
 
   const keyHandler = (e) => {
@@ -94,7 +94,7 @@ export function createDrawingModeSelector(ctx, state, options = {}) {
     onModeChange(state.drawingSubMode);
   }
 
-  return { container, modeLabel, keyHandler, clickHandler };
+  return { container, section, modeLabel, keyHandler, clickHandler };
 }
 
 export function hideDrawingModeSelector(state) {
