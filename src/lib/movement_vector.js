@@ -487,3 +487,142 @@ export function removeAdjacentSegmentLengths(map) {
     map.removeSource(ADJACENT_SEGMENTS_SOURCE_ID);
   }
 }
+
+const ALL_SEGMENTS_SOURCE_ID = 'all-segment-lengths';
+const ALL_SEGMENTS_LABEL_LAYER_ID = 'all-segment-lengths-label';
+
+/**
+ * Show all segment lengths for a feature (polygon or line)
+ * Used in direct_select mode to display segment lengths when feature is selected
+ * @param {Object} map - Mapbox GL map instance
+ * @param {Object} feature - Draw feature to show segment lengths for
+ */
+export function showAllSegmentLengths(map, feature) {
+  if (!map || !feature) {
+    removeAllSegmentLengths(map);
+    return;
+  }
+
+  const geojson = feature.toGeoJSON();
+  const geomType = geojson.geometry.type;
+  let coordinates = [];
+
+  if (geomType === 'Polygon') {
+    coordinates = geojson.geometry.coordinates[0];
+  } else if (geomType === 'LineString') {
+    coordinates = geojson.geometry.coordinates;
+  } else if (geomType === 'MultiPolygon') {
+    coordinates = geojson.geometry.coordinates[0][0];
+  } else if (geomType === 'MultiLineString') {
+    coordinates = geojson.geometry.coordinates[0];
+  } else {
+    removeAllSegmentLengths(map);
+    return;
+  }
+
+  if (!coordinates || coordinates.length < 2) {
+    removeAllSegmentLengths(map);
+    return;
+  }
+
+  const features = [];
+  const numSegments = geomType === 'Polygon' || geomType === 'MultiPolygon'
+    ? coordinates.length - 1
+    : coordinates.length - 1;
+
+  for (let i = 0; i < numSegments; i++) {
+    const start = coordinates[i];
+    const end = coordinates[i + 1];
+
+    const startPoint = turf.point(start);
+    const endPoint = turf.point(end);
+    const distance = turf.distance(startPoint, endPoint, { units: 'meters' });
+
+    const midpoint = turf.midpoint(startPoint, endPoint);
+    const bearing = turf.bearing(startPoint, endPoint);
+
+    const offsetDistance = 3 / 1000;
+    const perpendicularBearing = bearing - 90;
+    const offsetMidpoint = turf.destination(
+      midpoint,
+      offsetDistance,
+      perpendicularBearing,
+      { units: 'kilometers' }
+    );
+
+    let rotation = bearing - 90;
+    rotation = ((rotation % 360) + 360) % 360;
+    if (rotation > 90 && rotation < 270) {
+      rotation = (rotation + 180) % 360;
+    }
+
+    features.push({
+      type: 'Feature',
+      properties: {
+        label: formatDistance(distance),
+        rotation: rotation
+      },
+      geometry: {
+        type: 'Point',
+        coordinates: offsetMidpoint.geometry.coordinates
+      }
+    });
+  }
+
+  if (features.length === 0) {
+    removeAllSegmentLengths(map);
+    return;
+  }
+
+  const featureCollection = {
+    type: 'FeatureCollection',
+    features: features
+  };
+
+  if (!map.getSource(ALL_SEGMENTS_SOURCE_ID)) {
+    map.addSource(ALL_SEGMENTS_SOURCE_ID, {
+      type: 'geojson',
+      data: featureCollection
+    });
+
+    map.addLayer({
+      id: ALL_SEGMENTS_LABEL_LAYER_ID,
+      type: 'symbol',
+      source: ALL_SEGMENTS_SOURCE_ID,
+      layout: {
+        'text-field': ['get', 'label'],
+        'text-size': 10,
+        'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+        'text-offset': [0, 0],
+        'text-anchor': 'center',
+        'text-rotate': ['get', 'rotation'],
+        'text-rotation-alignment': 'map',
+        'text-pitch-alignment': 'map',
+        'text-allow-overlap': true,
+        'text-ignore-placement': true
+      },
+      paint: {
+        'text-color': '#666666',
+        'text-opacity': 1
+      }
+    });
+  } else {
+    map.getSource(ALL_SEGMENTS_SOURCE_ID).setData(featureCollection);
+  }
+}
+
+/**
+ * Remove all segment lengths visualization
+ * @param {Object} map - Mapbox GL map instance
+ */
+export function removeAllSegmentLengths(map) {
+  if (!map) return;
+
+  if (map.getLayer && map.getLayer(ALL_SEGMENTS_LABEL_LAYER_ID)) {
+    map.removeLayer(ALL_SEGMENTS_LABEL_LAYER_ID);
+  }
+
+  if (map.getSource && map.getSource(ALL_SEGMENTS_SOURCE_ID)) {
+    map.removeSource(ALL_SEGMENTS_SOURCE_ID);
+  }
+}

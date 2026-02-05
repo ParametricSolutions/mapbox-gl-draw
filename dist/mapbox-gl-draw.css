@@ -310,6 +310,7 @@
   font-size: 0.75rem;
   pointer-events: auto;
   min-width: 4.5rem;
+  min-height: 1.5rem;
   justify-content: center;
 }
 

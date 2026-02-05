@@ -4,7 +4,7 @@ import constrainFeatureMovement from '../lib/constrain_feature_movement.js';
 import doubleClickZoom from '../lib/double_click_zoom.js';
 import * as Constants from '../constants.js';
 import moveFeatures from '../lib/move_features.js';
-import { showMovementVector, removeMovementVector, showAdjacentSegmentLengths, removeAdjacentSegmentLengths } from '../lib/movement_vector.js';
+import { showMovementVector, removeMovementVector, showAdjacentSegmentLengths, removeAdjacentSegmentLengths, showAllSegmentLengths, removeAllSegmentLengths } from '../lib/movement_vector.js';
 import { findClickedEdge, determineRailDirection, constrainToRail, showRailLine, removeRailLine, showRailIndicator, removeRailIndicator } from '../lib/rail_constraint.js';
 import {
   showRightAngleIndicator,
@@ -994,6 +994,9 @@ DirectSelect.onSetup = function(opts) {
   this.createDistanceInput(state);
   this.createAngleInput(state);
 
+  // Show all segment lengths when entering direct_select mode
+  showAllSegmentLengths(this.map, feature);
+
   return state;
 };
 
@@ -1012,6 +1015,7 @@ DirectSelect.onStop = function(state) {
   removeRailIndicator(this.map);
   removeAllSnapIndicators(this.map);
   removeAdjacentSegmentLengths(this.map);
+  removeAllSegmentLengths(this.map);
   // Clean up distance/angle input UI and extended guidelines
   if (state) {
     this.removeDistanceAngleUI(state);
@@ -1130,8 +1134,9 @@ DirectSelect.onDrag = function(state, e) {
   }
 
   // ============================================================
-  // PRIORITY #2: RAIL CONSTRAINT
+  // PRIORITY #2: RAIL CONSTRAINT (with point snap override)
   // When edge was grabbed, constrain to perpendicular/parallel movement
+  // BUT: point snapping (corners, midpoints) takes priority over rail constraint
   // ============================================================
   if (state.railEdge && state.dragMoveStartLocation) {
     const railDir = determineRailDirection(
@@ -1153,9 +1158,26 @@ DirectSelect.onDrag = function(state, e) {
         state.railBearing
       );
 
-      lngLat = constrainToRail(state.dragMoveStartLocation, lngLat, state.railBearing);
+      // Check for point snapping BEFORE applying rail constraint
+      // Point snapping (corners, midpoints) takes priority over rail constraint
+      const snapping = this._ctx.snapping;
+      let pointSnapFound = false;
 
-      // Rail constraint is active - update coordinate and skip all other snapping
+      if (snapping && snapping.snappedGeometry && snapping.snappedGeometry.type === 'Point') {
+        // We're snapping to a point (corner or midpoint) - use snapped coordinate
+        const snappedCoord = snapping.snapCoord(lngLat);
+        if (snappedCoord.snapped) {
+          lngLat = { lng: snappedCoord.lng, lat: snappedCoord.lat };
+          pointSnapFound = true;
+        }
+      }
+
+      if (!pointSnapFound) {
+        // No point snap - apply rail constraint
+        lngLat = constrainToRail(state.dragMoveStartLocation, lngLat, state.railBearing);
+      }
+
+      // Update coordinate and skip all other snapping logic
       if (state.selectedCoordPaths.length === 1) {
         this.removeGuideCircle(state);
         removeAllSnapIndicators(this.map);
