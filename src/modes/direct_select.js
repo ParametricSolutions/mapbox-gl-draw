@@ -34,6 +34,7 @@ import {
 import {
   createDistanceInput as createDistanceInputUI,
   createAngleInput as createAngleInputUI,
+  createSnappingIndicator as createSnappingIndicatorUI,
   showDistanceAngleUI,
   hideDistanceAngleUI,
   removeDistanceAngleUI
@@ -172,6 +173,10 @@ DirectSelect.createAngleInput = function(state) {
     shouldActivateKeyHandler: () => true,
     forceCreate: true
   });
+};
+
+DirectSelect.createSnappingIndicator = function(state) {
+  createSnappingIndicatorUI(this._ctx, state, { forceCreate: true });
 };
 
 /**
@@ -866,6 +871,10 @@ DirectSelect.onVertex = function (state, e) {
     state.adjacentSegments = null;
   }
 
+  if (state.selectedCoordPaths.length === 1) {
+    this.showDistanceAngleUI(state);
+  }
+
   const selectedCoordinates = this.pathsToCoordinates(state.featureId, state.selectedCoordPaths);
   this.setSelectedCoordinates(selectedCoordinates);
 };
@@ -876,6 +885,7 @@ DirectSelect.onMidpoint = function(state, e) {
   state.feature.addCoordinate(about.coord_path, about.lng, about.lat);
   this.fireUpdate();
   state.selectedCoordPaths = [about.coord_path];
+  this.showDistanceAngleUI(state);
 };
 
 DirectSelect.pathsToCoordinates = function(featureId, paths) {
@@ -993,6 +1003,7 @@ DirectSelect.onSetup = function(opts) {
   // Create distance/angle input UI
   this.createDistanceInput(state);
   this.createAngleInput(state);
+  this.createSnappingIndicator(state);
 
   // Show all segment lengths when entering direct_select mode
   showAllSegmentLengths(this.map, feature);
