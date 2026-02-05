@@ -54,7 +54,7 @@ const defaultOptions = {
    * ['50%', '50%']                - center of map
    * ['2rem', 'calc(100% - 5rem)'] - lower-left area
    */
-  angleDistanceInputPosition: ['50%', 'calc(100% - 3rem)'],
+  angleDistanceInputPosition: ["50%", "calc(100% - 3rem)"],
 
   /**
    * Callback function to validate vertices before they are added.
@@ -65,6 +65,14 @@ const defaultOptions = {
    * @returns {boolean} - true to allow vertex, false to reject
    */
   validateVertex: null,
+
+  /**
+   * Callback fired when the drawing sub-mode changes (freeform/rectangle/line).
+   * Receives (mode, modeLabel, modeLabelElement).
+   * @type {function|null}
+   * @default null
+   */
+  onDrawingSubModeChange: null,
 };
 
 const showControls = {
