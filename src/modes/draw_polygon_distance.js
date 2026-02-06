@@ -3959,8 +3959,7 @@ DrawPolygonDistance.onKeyUp = function (state, e) {
       this.removeDistanceLabel(state);
       this.removeGuideCircle(state);
       // Reset polygon to line preview
-      const coords = [...state.vertices, state.vertices[0]];
-      state.polygon.setCoordinates([coords]);
+      state.polygon.setCoordinates([state.vertices]);
     } else if (state.vertices.length >= 3) {
       this.finishDrawing(state);
     } else {
@@ -3994,8 +3993,7 @@ DrawPolygonDistance.onKeyUp = function (state, e) {
       state.vertices.pop();
       // In rectangle mode, reset polygon to just the remaining vertices
       if (state.drawingSubMode === DRAWING_SUB_MODES.RECTANGLE) {
-        const coords = [...state.vertices, state.vertices[0]];
-        state.polygon.setCoordinates([coords]);
+        state.polygon.setCoordinates([state.vertices]);
       } else {
         state.polygon.removeCoordinate(`0.${state.vertices.length}`);
       }
@@ -4357,8 +4355,7 @@ DrawPolygonDistance.finishDrawing = function (state) {
   }
 
   // Close the polygon
-  const closedCoords = [...state.vertices, state.vertices[0]];
-  state.polygon.setCoordinates([closedCoords]);
+  state.polygon.setCoordinates([state.vertices]);
 
   // Clean up indicators before finishing
   this.removeGuideCircle(state);
@@ -4418,10 +4415,7 @@ DrawPolygonDistance.onTrash = function (state) {
     state.vertices.pop();
 
     if (state.drawingSubMode === DRAWING_SUB_MODES.RECTANGLE) {
-      const coords = state.vertices.length > 1
-        ? [...state.vertices, state.vertices[0]]
-        : [state.vertices[0]];
-      state.polygon.setCoordinates([coords]);
+      state.polygon.setCoordinates([state.vertices]);
     } else {
       state.polygon.removeCoordinate(`0.${state.vertices.length}`);
       if (state.polygon.coordinates[0].length > state.vertices.length) {
