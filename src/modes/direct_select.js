@@ -1101,6 +1101,9 @@ DirectSelect.onTouchStart = DirectSelect.onMouseDown = function(state, e) {
 
 DirectSelect.onDrag = function(state, e) {
   if (state.canDragMove !== true) return;
+  if (!state.dragMoving && state.feature.properties.isEditGeometry) {
+    this.map.fire("draw.dragstart", { featureId: state.featureId });
+  }
   state.dragMoving = true;
   e.originalEvent.stopPropagation();
   let lngLat = e.lngLat;
