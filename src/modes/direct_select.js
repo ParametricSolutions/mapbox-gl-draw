@@ -1,11 +1,32 @@
-import { noTarget, isOfMetaType, isActiveFeature, isInactiveFeature, isShiftDown } from '../lib/common_selectors.js';
-import createSupplementaryPoints from '../lib/create_supplementary_points.js';
-import constrainFeatureMovement from '../lib/constrain_feature_movement.js';
-import doubleClickZoom from '../lib/double_click_zoom.js';
-import * as Constants from '../constants.js';
-import moveFeatures from '../lib/move_features.js';
-import { showMovementVector, removeMovementVector, showAdjacentSegmentLengths, removeAdjacentSegmentLengths, showAllSegmentLengths, removeAllSegmentLengths } from '../lib/movement_vector.js';
-import { findClickedEdge, determineRailDirection, constrainToRail, showRailLine, removeRailLine, showRailIndicator, removeRailIndicator } from '../lib/rail_constraint.js';
+import {
+  noTarget,
+  isOfMetaType,
+  isActiveFeature,
+  isInactiveFeature,
+  isShiftDown,
+} from "../lib/common_selectors.js";
+import createSupplementaryPoints from "../lib/create_supplementary_points.js";
+import constrainFeatureMovement from "../lib/constrain_feature_movement.js";
+import doubleClickZoom from "../lib/double_click_zoom.js";
+import * as Constants from "../constants.js";
+import moveFeatures from "../lib/move_features.js";
+import {
+  showMovementVector,
+  removeMovementVector,
+  showAdjacentSegmentLengths,
+  removeAdjacentSegmentLengths,
+  showAllSegmentLengths,
+  removeAllSegmentLengths,
+} from "../lib/movement_vector.js";
+import {
+  findClickedEdge,
+  determineRailDirection,
+  constrainToRail,
+  showRailLine,
+  removeRailLine,
+  showRailIndicator,
+  removeRailIndicator,
+} from "../lib/rail_constraint.js";
 import {
   showRightAngleIndicator,
   removeRightAngleIndicator,
@@ -13,8 +34,8 @@ import {
   removeCollinearSnapLine,
   showParallelLineIndicator,
   removeParallelLineIndicator,
-  removeAllSnapIndicators
-} from '../lib/snap_indicators.js';
+  removeAllSnapIndicators,
+} from "../lib/snap_indicators.js";
 import {
   findNearestSegment,
   findNearbyParallelLines,
@@ -29,17 +50,17 @@ import {
   getPerpendicularToGuidelineBearing,
   getAdjacentSegmentsAtVertex,
   calculatePixelDistanceToExtendedGuidelines,
-  resolveSnapConflicts
-} from '../lib/distance_mode_helpers.js';
+  resolveSnapConflicts,
+} from "../lib/distance_mode_helpers.js";
 import {
   createDistanceInput as createDistanceInputUI,
   createAngleInput as createAngleInputUI,
   createSnappingIndicator as createSnappingIndicatorUI,
   showDistanceAngleUI,
   hideDistanceAngleUI,
-  removeDistanceAngleUI
-} from '../lib/angle_distance_input.js';
-import * as turf from '@turf/turf';
+  removeDistanceAngleUI,
+} from "../lib/angle_distance_input.js";
+import * as turf from "@turf/turf";
 
 const isVertex = isOfMetaType(Constants.meta.VERTEX);
 const isMidpoint = isOfMetaType(Constants.meta.MIDPOINT);
@@ -53,19 +74,23 @@ function getAdjacentSegmentBearings(feature, coordPath) {
   const geom = geojson.geometry;
 
   let coordinates = [];
-  if (geom.type === 'LineString') {
+  if (geom.type === "LineString") {
     coordinates = geom.coordinates;
-  } else if (geom.type === 'Polygon') {
+  } else if (geom.type === "Polygon") {
     coordinates = geom.coordinates[0]; // Outer ring
   } else {
     return [];
   }
 
   // Parse coord path to get index
-  const pathParts = coordPath.split('.');
+  const pathParts = coordPath.split(".");
   const vertexIndex = parseInt(pathParts[pathParts.length - 1], 10);
 
-  if (isNaN(vertexIndex) || vertexIndex < 0 || vertexIndex >= coordinates.length) {
+  if (
+    isNaN(vertexIndex) ||
+    vertexIndex < 0 ||
+    vertexIndex >= coordinates.length
+  ) {
     return [];
   }
 
@@ -79,16 +104,16 @@ function getAdjacentSegmentBearings(feature, coordPath) {
     segments.push({
       bearing: bearing,
       segment: { start: prevVertex, end: vertex },
-      type: 'previous'
+      type: "previous",
     });
-  } else if (geom.type === 'Polygon' && coordinates.length > 2) {
+  } else if (geom.type === "Polygon" && coordinates.length > 2) {
     // For polygon first vertex, wrap to last segment
     const lastVertex = coordinates[coordinates.length - 2]; // -2 because polygon closes
     const bearing = turf.bearing(turf.point(lastVertex), turf.point(vertex));
     segments.push({
       bearing: bearing,
       segment: { start: lastVertex, end: vertex },
-      type: 'previous'
+      type: "previous",
     });
   }
 
@@ -99,16 +124,16 @@ function getAdjacentSegmentBearings(feature, coordPath) {
     segments.push({
       bearing: bearing,
       segment: { start: vertex, end: nextVertex },
-      type: 'next'
+      type: "next",
     });
-  } else if (geom.type === 'Polygon' && coordinates.length > 2) {
+  } else if (geom.type === "Polygon" && coordinates.length > 2) {
     // For polygon last vertex, wrap to first segment
     const firstVertex = coordinates[1]; // Skip closing vertex
     const bearing = turf.bearing(turf.point(vertex), turf.point(firstVertex));
     segments.push({
       bearing: bearing,
       segment: { start: vertex, end: firstVertex },
-      type: 'next'
+      type: "next",
     });
   }
 
@@ -143,7 +168,7 @@ function getOrthogonalSnapBearing(adjacentSegments, mouseBearing, tolerance) {
           bearing: orthogonalBearing,
           referenceBearing: segmentInfo.bearing,
           referenceSegment: segmentInfo.segment,
-          angleFromReference: angle
+          angleFromReference: angle,
         };
       }
     }
@@ -157,46 +182,46 @@ const DirectSelect = {};
 /**
  * Create the distance input UI for vertex editing
  */
-DirectSelect.createDistanceInput = function(state) {
+DirectSelect.createDistanceInput = function (state) {
   createDistanceInputUI(this._ctx, state, {
     shouldActivateKeyHandler: () => true,
     initiallyHidden: true,
-    forceCreate: true
+    forceCreate: true,
   });
 };
 
 /**
  * Create the angle input UI for vertex editing
  */
-DirectSelect.createAngleInput = function(state) {
+DirectSelect.createAngleInput = function (state) {
   createAngleInputUI(this._ctx, state, {
     shouldActivateKeyHandler: () => true,
-    forceCreate: true
+    forceCreate: true,
   });
 };
 
-DirectSelect.createSnappingIndicator = function(state) {
+DirectSelect.createSnappingIndicator = function (state) {
   createSnappingIndicatorUI(this._ctx, state, { forceCreate: true });
 };
 
 /**
  * Show the distance/angle input UI
  */
-DirectSelect.showDistanceAngleUI = function(state) {
+DirectSelect.showDistanceAngleUI = function (state) {
   showDistanceAngleUI(state);
 };
 
 /**
  * Hide the distance/angle input UI
  */
-DirectSelect.hideDistanceAngleUI = function(state) {
+DirectSelect.hideDistanceAngleUI = function (state) {
   hideDistanceAngleUI(state);
 };
 
 /**
  * Remove the distance/angle input UI elements
  */
-DirectSelect.removeDistanceAngleUI = function(state) {
+DirectSelect.removeDistanceAngleUI = function (state) {
   removeDistanceAngleUI(state);
 };
 
@@ -204,13 +229,13 @@ DirectSelect.removeDistanceAngleUI = function(state) {
  * Detect if the mouse is hovering over an intersection point (snappingPoint)
  * Returns intersection info if found, null otherwise
  */
-DirectSelect.detectHoveredIntersectionPoint = function(state, e) {
+DirectSelect.detectHoveredIntersectionPoint = function (state, e) {
   const map = this.map;
   if (!map || !this._ctx.snapping) return null;
 
   // Query features at the hover point from snap buffer layers
   const bufferLayers = this._ctx.snapping.bufferLayers.map(
-    (layerId) => '_snap_buffer_' + layerId
+    (layerId) => "_snap_buffer_" + layerId
   );
   const featuresAtPoint = map.queryRenderedFeatures(e.point, {
     layers: bufferLayers,
@@ -220,7 +245,7 @@ DirectSelect.detectHoveredIntersectionPoint = function(state, e) {
   const midpoint = featuresAtPoint.find((feature) => {
     return (
       feature.properties &&
-      feature.properties.type === 'snappingPoint' &&
+      feature.properties.type === "snappingPoint" &&
       feature.properties.isMidpoint === true &&
       feature.properties.guidelineIds
     );
@@ -231,7 +256,7 @@ DirectSelect.detectHoveredIntersectionPoint = function(state, e) {
       coord: midpoint.geometry.coordinates,
       feature: midpoint,
       guidelineIds: JSON.parse(midpoint.properties.guidelineIds),
-      type: 'midpoint',
+      type: "midpoint",
     };
   }
 
@@ -239,7 +264,7 @@ DirectSelect.detectHoveredIntersectionPoint = function(state, e) {
   const intersectionPoint = featuresAtPoint.find((feature) => {
     return (
       feature.properties &&
-      feature.properties.type === 'snappingPoint' &&
+      feature.properties.type === "snappingPoint" &&
       feature.properties.guidelineIds &&
       feature.properties.isMidpoint !== true
     );
@@ -250,7 +275,7 @@ DirectSelect.detectHoveredIntersectionPoint = function(state, e) {
       coord: intersectionPoint.geometry.coordinates,
       guidelineIds: JSON.parse(intersectionPoint.properties.guidelineIds),
       feature: intersectionPoint,
-      type: 'intersection'
+      type: "intersection",
     };
   }
 
@@ -263,7 +288,7 @@ DirectSelect.detectHoveredIntersectionPoint = function(state, e) {
  * @param {Object} lngLat - Position to check for snapping {lng, lat}
  * @returns {Object|null} Snap info with type ('point' or 'line'), coord, bearing, segment, snappedFeature
  */
-DirectSelect.getSnapInfo = function(lngLat) {
+DirectSelect.getSnapInfo = function (lngLat) {
   const snapping = this._ctx.snapping;
   if (!snapping || !snapping.snappedGeometry) {
     return null;
@@ -279,18 +304,19 @@ DirectSelect.getSnapInfo = function(lngLat) {
   }
 
   // Point snap
-  if (geom.type === 'Point') {
+  if (geom.type === "Point") {
     return {
-      type: 'point',
+      type: "point",
       coord: [snapCoord.lng, snapCoord.lat],
-      snappedFeature: snapping.snappedFeature
+      snappedFeature: snapping.snappedFeature,
     };
   }
 
   // Line snap (LineString or MultiLineString)
-  if (geom.type === 'LineString' || geom.type === 'MultiLineString') {
+  if (geom.type === "LineString" || geom.type === "MultiLineString") {
     const snapPoint = turf.point([snapCoord.lng, snapCoord.lat]);
-    const coords = geom.type === 'LineString' ? geom.coordinates : geom.coordinates.flat();
+    const coords =
+      geom.type === "LineString" ? geom.coordinates : geom.coordinates.flat();
 
     const result = findNearestSegment(coords, snapPoint);
     if (result) {
@@ -299,11 +325,11 @@ DirectSelect.getSnapInfo = function(lngLat) {
         turf.point(result.segment.end)
       );
       return {
-        type: 'line',
+        type: "line",
         coord: [snapCoord.lng, snapCoord.lat],
         bearing: bearing,
         segment: result.segment,
-        snappedFeature: snapping.snappedFeature
+        snappedFeature: snapping.snappedFeature,
       };
     }
   }
@@ -315,14 +341,14 @@ DirectSelect.getSnapInfo = function(lngLat) {
  * Extend guidelines from an intersection or midpoint
  * Returns array of extended line features
  */
-DirectSelect.extendGuidelines = function(state, intersectionInfo) {
+DirectSelect.extendGuidelines = function (state, intersectionInfo) {
   const map = this.map;
   if (!map) return [];
 
   const extendedLines = [];
 
   // Handle midpoint type - create perpendicular guideline
-  if (intersectionInfo.type === 'midpoint') {
+  if (intersectionInfo.type === "midpoint") {
     const { coord, guidelineIds } = intersectionInfo;
 
     // Get the parent line from the guideline ID
@@ -343,7 +369,7 @@ DirectSelect.extendGuidelines = function(state, intersectionInfo) {
     let lineBearing;
 
     // Calculate the bearing of the line segment containing the midpoint
-    if (geometry.type === 'LineString') {
+    if (geometry.type === "LineString") {
       const coords = geometry.coordinates;
       if (coords.length < 2) return [];
 
@@ -355,7 +381,9 @@ DirectSelect.extendGuidelines = function(state, intersectionInfo) {
         const end = coords[i + 1];
         const mid = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2];
 
-        const dist = turf.distance(turf.point(mid), coordPoint, { units: 'meters' });
+        const dist = turf.distance(turf.point(mid), coordPoint, {
+          units: "meters",
+        });
         if (dist < 1) {
           segmentBearing = turf.bearing(turf.point(start), turf.point(end));
           break;
@@ -370,7 +398,7 @@ DirectSelect.extendGuidelines = function(state, intersectionInfo) {
       }
 
       lineBearing = segmentBearing;
-    } else if (geometry.type === 'MultiLineString') {
+    } else if (geometry.type === "MultiLineString") {
       let segmentBearing;
       const coordPoint = turf.point(coord);
       for (const lineCoords of geometry.coordinates) {
@@ -381,7 +409,9 @@ DirectSelect.extendGuidelines = function(state, intersectionInfo) {
           const end = lineCoords[i + 1];
           const mid = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2];
 
-          const dist = turf.distance(turf.point(mid), coordPoint, { units: 'meters' });
+          const dist = turf.distance(turf.point(mid), coordPoint, {
+            units: "meters",
+          });
           if (dist < 1) {
             segmentBearing = turf.bearing(turf.point(start), turf.point(end));
             break;
@@ -398,26 +428,27 @@ DirectSelect.extendGuidelines = function(state, intersectionInfo) {
 
     // Create perpendicular line (90 degrees to the original line)
     const perpendicularBearing = lineBearing + 90;
-    const extensionDistance = this._ctx.options.extendedGuidelineDistance || 0.2;
+    const extensionDistance =
+      this._ctx.options.extendedGuidelineDistance || 0.2;
 
     const extendedStart = turf.destination(
       turf.point(coord),
       extensionDistance,
       perpendicularBearing + 180,
-      { units: 'kilometers' }
+      { units: "kilometers" }
     );
     const extendedEnd = turf.destination(
       turf.point(coord),
       extensionDistance,
       perpendicularBearing,
-      { units: 'kilometers' }
+      { units: "kilometers" }
     );
 
     extendedLines.push({
-      type: 'Feature',
+      type: "Feature",
       properties: { isExtendedGuideline: true, isMidpointGuideline: true },
       geometry: {
-        type: 'LineString',
+        type: "LineString",
         coordinates: [
           extendedStart.geometry.coordinates,
           coord,
@@ -448,7 +479,7 @@ DirectSelect.extendGuidelines = function(state, intersectionInfo) {
 
     let geometry = guidelineFeature.geometry;
 
-    if (geometry.type === 'LineString') {
+    if (geometry.type === "LineString") {
       const coords = geometry.coordinates;
       if (coords.length < 2) continue;
 
@@ -457,25 +488,26 @@ DirectSelect.extendGuidelines = function(state, intersectionInfo) {
         turf.point(coords[coords.length - 1])
       );
 
-      const extensionDistance = this._ctx.options.extendedGuidelineDistance || 0.2;
+      const extensionDistance =
+        this._ctx.options.extendedGuidelineDistance || 0.2;
       const extendedStart = turf.destination(
         turf.point(coords[0]),
         extensionDistance,
         bearing + 180,
-        { units: 'kilometers' }
+        { units: "kilometers" }
       );
       const extendedEnd = turf.destination(
         turf.point(coords[coords.length - 1]),
         extensionDistance,
         bearing,
-        { units: 'kilometers' }
+        { units: "kilometers" }
       );
 
       extendedLines.push({
-        type: 'Feature',
+        type: "Feature",
         properties: { isExtendedGuideline: true },
         geometry: {
-          type: 'LineString',
+          type: "LineString",
           coordinates: [
             extendedStart.geometry.coordinates,
             ...coords,
@@ -483,7 +515,7 @@ DirectSelect.extendGuidelines = function(state, intersectionInfo) {
           ],
         },
       });
-    } else if (geometry.type === 'MultiLineString') {
+    } else if (geometry.type === "MultiLineString") {
       for (const lineCoords of geometry.coordinates) {
         if (lineCoords.length < 2) continue;
 
@@ -492,25 +524,26 @@ DirectSelect.extendGuidelines = function(state, intersectionInfo) {
           turf.point(lineCoords[lineCoords.length - 1])
         );
 
-        const extensionDistance = this._ctx.options.extendedGuidelineDistance || 0.2;
+        const extensionDistance =
+          this._ctx.options.extendedGuidelineDistance || 0.2;
         const extendedStart = turf.destination(
           turf.point(lineCoords[0]),
           extensionDistance,
           bearing + 180,
-          { units: 'kilometers' }
+          { units: "kilometers" }
         );
         const extendedEnd = turf.destination(
           turf.point(lineCoords[lineCoords.length - 1]),
           extensionDistance,
           bearing,
-          { units: 'kilometers' }
+          { units: "kilometers" }
         );
 
         extendedLines.push({
-          type: 'Feature',
+          type: "Feature",
           properties: { isExtendedGuideline: true },
           geometry: {
-            type: 'LineString',
+            type: "LineString",
             coordinates: [
               extendedStart.geometry.coordinates,
               ...lineCoords,
@@ -528,49 +561,49 @@ DirectSelect.extendGuidelines = function(state, intersectionInfo) {
 /**
  * Render extended guidelines on the map
  */
-DirectSelect.renderExtendedGuidelines = function(state, extendedLines) {
+DirectSelect.renderExtendedGuidelines = function (state, extendedLines) {
   const map = this.map;
   if (!map) return;
 
   const featureCollection = {
-    type: 'FeatureCollection',
+    type: "FeatureCollection",
     features: extendedLines,
   };
 
   // Create or update the visual layer for extended guidelines
-  if (!map.getSource('extended-guidelines')) {
-    map.addSource('extended-guidelines', {
-      type: 'geojson',
+  if (!map.getSource("extended-guidelines")) {
+    map.addSource("extended-guidelines", {
+      type: "geojson",
       data: featureCollection,
     });
 
     map.addLayer({
-      id: 'extended-guidelines',
-      type: 'line',
-      source: 'extended-guidelines',
+      id: "extended-guidelines",
+      type: "line",
+      source: "extended-guidelines",
       paint: {
-        'line-color': '#000000',
-        'line-width': 1,
-        'line-opacity': 0.3,
-        'line-dasharray': [4, 4],
+        "line-color": "#000000",
+        "line-width": 1,
+        "line-opacity": 0.3,
+        "line-dasharray": [4, 4],
       },
     });
   } else {
-    map.getSource('extended-guidelines').setData(featureCollection);
+    map.getSource("extended-guidelines").setData(featureCollection);
   }
 
   // Create or update the snap buffer layer for extended guidelines
-  const bufferLayerId = '_snap_buffer_extended-guidelines';
+  const bufferLayerId = "_snap_buffer_extended-guidelines";
   const snapDistance = this._ctx.options.snapDistance || 15;
 
   if (!map.getLayer(bufferLayerId)) {
     map.addLayer({
       id: bufferLayerId,
-      type: 'line',
-      source: 'extended-guidelines',
+      type: "line",
+      source: "extended-guidelines",
       paint: {
-        'line-color': 'hsla(0,100%,50%,0.001)',
-        'line-width': snapDistance * 2,
+        "line-color": "hsla(0,100%,50%,0.001)",
+        "line-width": snapDistance * 2,
       },
     });
 
@@ -578,11 +611,18 @@ DirectSelect.renderExtendedGuidelines = function(state, extendedLines) {
     const mouseoverHandler = (e) => {
       if (e.features && e.features.length > 0) {
         // Clear snap-hover state from previous snapped feature before switching
-        if (this._ctx.snapping.snappedFeature &&
-            this._ctx.snapping.snappedFeature.id !== undefined &&
-            !(this._ctx.snapping.snappedFeature.properties &&
-              this._ctx.snapping.snappedFeature.properties.isExtendedGuideline)) {
-          this._ctx.snapping.setSnapHoverState(this._ctx.snapping.snappedFeature, false);
+        if (
+          this._ctx.snapping.snappedFeature &&
+          this._ctx.snapping.snappedFeature.id !== undefined &&
+          !(
+            this._ctx.snapping.snappedFeature.properties &&
+            this._ctx.snapping.snappedFeature.properties.isExtendedGuideline
+          )
+        ) {
+          this._ctx.snapping.setSnapHoverState(
+            this._ctx.snapping.snappedFeature,
+            false
+          );
         }
         const feature = e.features[0];
         this._ctx.snapping.snappedGeometry = feature.geometry;
@@ -607,15 +647,15 @@ DirectSelect.renderExtendedGuidelines = function(state, extendedLines) {
     state.extendedGuidelineMouseoverHandler = mouseoverHandler;
     state.extendedGuidelineMouseoutHandler = mouseoutHandler;
 
-    map.on('mousemove', bufferLayerId, mouseoverHandler);
-    map.on('mouseout', bufferLayerId, mouseoutHandler);
+    map.on("mousemove", bufferLayerId, mouseoverHandler);
+    map.on("mouseout", bufferLayerId, mouseoutHandler);
   }
 };
 
 /**
  * Update the guide circle showing distance constraint
  */
-DirectSelect.updateGuideCircle = function(state, center, radius) {
+DirectSelect.updateGuideCircle = function (state, center, radius) {
   // Check if we can reuse the existing circle (optimization)
   if (
     state.guideCircle &&
@@ -633,16 +673,16 @@ DirectSelect.updateGuideCircle = function(state, center, radius) {
   for (let i = 0; i <= steps; i++) {
     const angle = (i / steps) * 360;
     const pt = turf.destination(turf.point(center), radius / 1000, angle, {
-      units: 'kilometers',
+      units: "kilometers",
     });
     circleCoords.push(pt.geometry.coordinates);
   }
 
   const circleFeature = {
-    type: 'Feature',
+    type: "Feature",
     properties: { isGuideCircle: true },
     geometry: {
-      type: 'LineString',
+      type: "LineString",
       coordinates: circleCoords,
     },
   };
@@ -654,40 +694,40 @@ DirectSelect.updateGuideCircle = function(state, center, radius) {
   const map = this.map;
   if (!map) return;
 
-  if (!map.getSource('distance-guide-circle')) {
-    map.addSource('distance-guide-circle', {
-      type: 'geojson',
+  if (!map.getSource("distance-guide-circle")) {
+    map.addSource("distance-guide-circle", {
+      type: "geojson",
       data: circleFeature,
     });
 
     map.addLayer({
-      id: 'distance-guide-circle',
-      type: 'line',
-      source: 'distance-guide-circle',
+      id: "distance-guide-circle",
+      type: "line",
+      source: "distance-guide-circle",
       paint: {
-        'line-color': '#000000',
-        'line-width': 1,
-        'line-opacity': 0.2,
-        'line-dasharray': [2, 2],
+        "line-color": "#000000",
+        "line-width": 1,
+        "line-opacity": 0.2,
+        "line-dasharray": [2, 2],
       },
     });
   } else {
-    map.getSource('distance-guide-circle').setData(circleFeature);
+    map.getSource("distance-guide-circle").setData(circleFeature);
   }
 };
 
 /**
  * Remove the guide circle
  */
-DirectSelect.removeGuideCircle = function(state) {
+DirectSelect.removeGuideCircle = function (state) {
   const map = this.map;
   if (!map) return;
 
-  if (map.getLayer && map.getLayer('distance-guide-circle')) {
-    map.removeLayer('distance-guide-circle');
+  if (map.getLayer && map.getLayer("distance-guide-circle")) {
+    map.removeLayer("distance-guide-circle");
   }
-  if (map.getSource && map.getSource('distance-guide-circle')) {
-    map.removeSource('distance-guide-circle');
+  if (map.getSource && map.getSource("distance-guide-circle")) {
+    map.removeSource("distance-guide-circle");
   }
   state.guideCircle = null;
   state.guideCircleRadius = null;
@@ -697,19 +737,23 @@ DirectSelect.removeGuideCircle = function(state) {
 /**
  * Remove extended guidelines from the map
  */
-DirectSelect.removeExtendedGuidelines = function(state) {
+DirectSelect.removeExtendedGuidelines = function (state) {
   const map = this.map;
   if (!map) return;
 
-  const bufferLayerId = '_snap_buffer_extended-guidelines';
+  const bufferLayerId = "_snap_buffer_extended-guidelines";
 
   // Remove event handlers
   if (state.extendedGuidelineMouseoverHandler) {
-    map.off('mousemove', bufferLayerId, state.extendedGuidelineMouseoverHandler);
+    map.off(
+      "mousemove",
+      bufferLayerId,
+      state.extendedGuidelineMouseoverHandler
+    );
     state.extendedGuidelineMouseoverHandler = null;
   }
   if (state.extendedGuidelineMouseoutHandler) {
-    map.off('mouseout', bufferLayerId, state.extendedGuidelineMouseoutHandler);
+    map.off("mouseout", bufferLayerId, state.extendedGuidelineMouseoutHandler);
     state.extendedGuidelineMouseoutHandler = null;
   }
 
@@ -727,11 +771,11 @@ DirectSelect.removeExtendedGuidelines = function(state) {
   }
 
   // Remove visual layer
-  if (map.getLayer && map.getLayer('extended-guidelines')) {
-    map.removeLayer('extended-guidelines');
+  if (map.getLayer && map.getLayer("extended-guidelines")) {
+    map.removeLayer("extended-guidelines");
   }
-  if (map.getSource && map.getSource('extended-guidelines')) {
-    map.removeSource('extended-guidelines');
+  if (map.getSource && map.getSource("extended-guidelines")) {
+    map.removeSource("extended-guidelines");
   }
 
   // Clear snapping if it's pointing to extended guidelines
@@ -767,22 +811,22 @@ DirectSelect.updateExtendedGuidelinesOpacity = function (state) {
 
 // INTERNAL FUCNTIONS
 
-DirectSelect.fireUpdate = function() {
+DirectSelect.fireUpdate = function () {
   this.fire(Constants.events.UPDATE, {
     action: Constants.updateActions.CHANGE_COORDINATES,
-    features: this.getSelected().map(f => f.toGeoJSON())
+    features: this.getSelected().map((f) => f.toGeoJSON()),
   });
 };
 
-DirectSelect.fireActionable = function(state) {
+DirectSelect.fireActionable = function (state) {
   this.setActionableState({
     combineFeatures: false,
     uncombineFeatures: false,
-    trash: state.selectedCoordPaths.length > 0
+    trash: state.selectedCoordPaths.length > 0,
   });
 };
 
-DirectSelect.startDragging = function(state, e) {
+DirectSelect.startDragging = function (state, e) {
   state.initialDragPanState = this.map.dragPan.isEnabled();
 
   this.map.dragPan.disable();
@@ -802,7 +846,7 @@ DirectSelect.startDragging = function(state, e) {
   }
 };
 
-DirectSelect.stopDragging = function(state) {
+DirectSelect.stopDragging = function (state) {
   if (state.canDragMove && state.initialDragPanState === true) {
     this.map.dragPan.enable();
   }
@@ -860,13 +904,18 @@ DirectSelect.onVertex = function (state, e) {
 
   // Store the actual vertex coordinate (not mouse position) for distance calculations
   if (state.selectedCoordPaths.length === 1) {
-    const vertexCoord = state.feature.getCoordinate(state.selectedCoordPaths[0]);
+    const vertexCoord = state.feature.getCoordinate(
+      state.selectedCoordPaths[0]
+    );
     state.originalVertexCoord = vertexCoord; // [lng, lat]
   }
 
   // Extract adjacent segment bearings for single vertex selection (for orthogonal snapping)
   if (state.selectedCoordPaths.length === 1) {
-    state.adjacentSegments = getAdjacentSegmentBearings(state.feature, state.selectedCoordPaths[0]);
+    state.adjacentSegments = getAdjacentSegmentBearings(
+      state.feature,
+      state.selectedCoordPaths[0]
+    );
   } else {
     state.adjacentSegments = null;
   }
@@ -875,11 +924,14 @@ DirectSelect.onVertex = function (state, e) {
     this.showDistanceAngleUI(state);
   }
 
-  const selectedCoordinates = this.pathsToCoordinates(state.featureId, state.selectedCoordPaths);
+  const selectedCoordinates = this.pathsToCoordinates(
+    state.featureId,
+    state.selectedCoordPaths
+  );
   this.setSelectedCoordinates(selectedCoordinates);
 };
 
-DirectSelect.onMidpoint = function(state, e) {
+DirectSelect.onMidpoint = function (state, e) {
   this.startDragging(state, e);
   const about = e.featureTarget.properties;
   state.feature.addCoordinate(about.coord_path, about.lng, about.lat);
@@ -888,35 +940,48 @@ DirectSelect.onMidpoint = function(state, e) {
   this.showDistanceAngleUI(state);
 };
 
-DirectSelect.pathsToCoordinates = function(featureId, paths) {
-  return paths.map(coord_path => ({ feature_id: featureId, coord_path }));
+DirectSelect.pathsToCoordinates = function (featureId, paths) {
+  return paths.map((coord_path) => ({ feature_id: featureId, coord_path }));
 };
 
-DirectSelect.onFeature = function(state, e) {
+DirectSelect.onFeature = function (state, e) {
   if (state.selectedCoordPaths.length === 0) this.startDragging(state, e);
   else this.stopDragging(state);
 };
 
-DirectSelect.dragFeature = function(state, e, delta) {
+DirectSelect.dragFeature = function (state, e, delta) {
   moveFeatures(this.getSelected(), delta);
+  if (state.feature.properties.isEditGeometry) {
+    this._ctx.store.getAll().forEach((f) => {
+      if (f.properties.isEditGeometry && f.id !== state.featureId) {
+        moveFeatures([f], delta);
+      }
+    });
+  }
   state.dragMoveLocation = e.lngLat;
 };
 
-DirectSelect.dragVertex = function(state, e, delta) {
-  const selectedCoords = state.selectedCoordPaths.map(coord_path => state.feature.getCoordinate(coord_path));
-  const selectedCoordPoints = selectedCoords.map(coords => ({
+DirectSelect.dragVertex = function (state, e, delta) {
+  const selectedCoords = state.selectedCoordPaths.map((coord_path) =>
+    state.feature.getCoordinate(coord_path)
+  );
+  const selectedCoordPoints = selectedCoords.map((coords) => ({
     type: Constants.geojsonTypes.FEATURE,
     properties: {},
     geometry: {
       type: Constants.geojsonTypes.POINT,
-      coordinates: coords
-    }
+      coordinates: coords,
+    },
   }));
 
   const constrainedDelta = constrainFeatureMovement(selectedCoordPoints, delta);
   for (let i = 0; i < selectedCoords.length; i++) {
     const coord = selectedCoords[i];
-    state.feature.updateCoordinate(state.selectedCoordPaths[i], coord[0] + constrainedDelta.lng, coord[1] + constrainedDelta.lat);
+    state.feature.updateCoordinate(
+      state.selectedCoordPaths[i],
+      coord[0] + constrainedDelta.lng,
+      coord[1] + constrainedDelta.lat
+    );
   }
 };
 
@@ -936,16 +1001,16 @@ DirectSelect.clickActiveFeature = function (state) {
 
 // EXTERNAL FUNCTIONS
 
-DirectSelect.onSetup = function(opts) {
+DirectSelect.onSetup = function (opts) {
   const featureId = opts.featureId;
   const feature = this.getFeature(featureId);
 
   if (!feature) {
-    throw new Error('You must provide a featureId to enter direct_select mode');
+    throw new Error("You must provide a featureId to enter direct_select mode");
   }
 
   if (feature.type === Constants.geojsonTypes.POINT) {
-    throw new TypeError('direct_select mode doesn\'t handle point features');
+    throw new TypeError("direct_select mode doesn't handle point features");
   }
 
   const state = {
@@ -989,15 +1054,17 @@ DirectSelect.onSetup = function(opts) {
     guideCircleRadius: null,
     guideCircleCenter: null,
     // Original vertex position for distance calculations
-    originalVertexCoord: null
+    originalVertexCoord: null,
   };
 
   this.setSelected(featureId);
-  this.setSelectedCoordinates(this.pathsToCoordinates(featureId, state.selectedCoordPaths));
+  this.setSelectedCoordinates(
+    this.pathsToCoordinates(featureId, state.selectedCoordPaths)
+  );
   doubleClickZoom.disable(this);
 
   this.setActionableState({
-    trash: true
+    trash: true,
   });
 
   // Create distance/angle input UI
@@ -1011,13 +1078,18 @@ DirectSelect.onSetup = function(opts) {
   return state;
 };
 
-DirectSelect.onStop = function(state) {
+DirectSelect.onStop = function (state) {
   doubleClickZoom.enable(this);
   this.clearSelectedCoordinates();
 
   // Ensure dragPan is re-enabled when exiting the mode
   // This handles cases where stopDragging wasn't called or failed to re-enable it
-  if (state && state.initialDragPanState === true && this.map && this.map.dragPan) {
+  if (
+    state &&
+    state.initialDragPanState === true &&
+    this.map &&
+    this.map.dragPan
+  ) {
     this.map.dragPan.enable();
   }
 
@@ -1034,15 +1106,21 @@ DirectSelect.onStop = function(state) {
   }
 };
 
-DirectSelect.toDisplayFeatures = function(state, geojson, push) {
+DirectSelect.toDisplayFeatures = function (state, geojson, push) {
   if (state.featureId === geojson.properties.id) {
     geojson.properties.active = Constants.activeStates.ACTIVE;
     push(geojson);
-    createSupplementaryPoints(geojson, {
-      map: this.map,
-      midpoints: true,
-      selectedPaths: state.selectedCoordPaths
-    }).forEach(push);
+    const hideVertices =
+      state.feature.properties.isEditGeometry &&
+      ((state.dragMoving && state.selectedCoordPaths.length === 0) ||
+        geojson.properties.user_hideVertices);
+    if (!hideVertices) {
+      createSupplementaryPoints(geojson, {
+        map: this.map,
+        midpoints: true,
+        selectedPaths: state.selectedCoordPaths,
+      }).forEach(push);
+    }
   } else {
     geojson.properties.active = Constants.activeStates.INACTIVE;
     push(geojson);
@@ -1050,12 +1128,12 @@ DirectSelect.toDisplayFeatures = function(state, geojson, push) {
   this.fireActionable(state);
 };
 
-DirectSelect.onTrash = function(state) {
+DirectSelect.onTrash = function (state) {
   // Uses number-aware sorting to make sure '9' < '10'. Comparison is reversed because we want them
   // in reverse order so that we can remove by index safely.
   state.selectedCoordPaths
-    .sort((a, b) => b.localeCompare(a, 'en', { numeric: true }))
-    .forEach(id => state.feature.removeCoordinate(id));
+    .sort((a, b) => b.localeCompare(a, "en", { numeric: true }))
+    .forEach((id) => state.feature.removeCoordinate(id));
   this.fireUpdate();
   state.selectedCoordPaths = [];
   this.clearSelectedCoordinates();
@@ -1066,17 +1144,22 @@ DirectSelect.onTrash = function(state) {
   }
 };
 
-DirectSelect.onMouseMove = function(state, e) {
+DirectSelect.onMouseMove = function (state, e) {
   // On mousemove that is not a drag, stop vertex movement.
   const isFeature = isActiveFeature(e);
   const onVertex = isVertex(e);
   const isMidPoint = isMidpoint(e);
   const noCoords = state.selectedCoordPaths.length === 0;
-  if (isFeature && noCoords) this.updateUIClasses({ mouse: Constants.cursors.MOVE });
-  else if (onVertex && !noCoords) this.updateUIClasses({ mouse: Constants.cursors.MOVE });
+  const isCompanionEdit =
+    !isFeature && e.featureTarget?.properties?.user_isEditGeometry;
+  if ((isFeature && noCoords) || isCompanionEdit)
+    this.updateUIClasses({ mouse: Constants.cursors.MOVE });
+  else if (onVertex && !noCoords)
+    this.updateUIClasses({ mouse: Constants.cursors.MOVE });
   else this.updateUIClasses({ mouse: Constants.cursors.NONE });
 
-  const isDraggableItem = onVertex || isFeature || isMidPoint;
+  const isDraggableItem =
+    onVertex || isFeature || isMidPoint || isCompanionEdit;
   if (isDraggableItem && state.dragMoving) this.fireUpdate();
 
   this.stopDragging(state);
@@ -1085,7 +1168,7 @@ DirectSelect.onMouseMove = function(state, e) {
   return true;
 };
 
-DirectSelect.onMouseOut = function(state) {
+DirectSelect.onMouseOut = function (state) {
   // As soon as you mouse leaves the canvas, update the feature
   if (state.dragMoving) this.fireUpdate();
 
@@ -1093,13 +1176,18 @@ DirectSelect.onMouseOut = function(state) {
   return true;
 };
 
-DirectSelect.onTouchStart = DirectSelect.onMouseDown = function(state, e) {
+DirectSelect.onTouchStart = DirectSelect.onMouseDown = function (state, e) {
   if (isVertex(e)) return this.onVertex(state, e);
   if (isActiveFeature(e)) return this.onFeature(state, e);
   if (isMidpoint(e)) return this.onMidpoint(state, e);
+  if (e.featureTarget?.properties?.user_isEditGeometry) {
+    state.selectedCoordPaths = [];
+    this.startDragging(state, e);
+    state.railEdge = null;
+  }
 };
 
-DirectSelect.onDrag = function(state, e) {
+DirectSelect.onDrag = function (state, e) {
   if (state.canDragMove !== true) return;
   if (!state.dragMoving && state.feature.properties.isEditGeometry) {
     this.map.fire("draw.dragstart", { featureId: state.featureId });
@@ -1122,19 +1210,28 @@ DirectSelect.onDrag = function(state, e) {
       state.railConstraintActive = false;
       state.orthogonalSnapActive = false;
       state.parallelSnapActive = false;
-      state.feature.updateCoordinate(state.selectedCoordPaths[0], lngLat.lng, lngLat.lat);
+      state.feature.updateCoordinate(
+        state.selectedCoordPaths[0],
+        lngLat.lng,
+        lngLat.lat
+      );
       state.dragMoveLocation = lngLat;
       if (state.dragMoveStartLocation) {
         showMovementVector(this.map, state.dragMoveStartLocation, lngLat);
       }
-      showAdjacentSegmentLengths(this.map, state.feature, state.selectedCoordPaths[0], lngLat);
+      showAdjacentSegmentLengths(
+        this.map,
+        state.feature,
+        state.selectedCoordPaths[0],
+        lngLat
+      );
       return;
     } else {
       // Multiple vertices or feature dragging with shift
       this.removeGuideCircle(state);
       const delta = {
         lng: lngLat.lng - state.dragMoveLocation.lng,
-        lat: lngLat.lat - state.dragMoveLocation.lat
+        lat: lngLat.lat - state.dragMoveLocation.lat,
       };
       if (state.selectedCoordPaths.length > 0) this.dragVertex(state, e, delta);
       else this.dragFeature(state, e, delta);
@@ -1177,7 +1274,11 @@ DirectSelect.onDrag = function(state, e) {
       const snapping = this._ctx.snapping;
       let pointSnapFound = false;
 
-      if (snapping && snapping.snappedGeometry && snapping.snappedGeometry.type === 'Point') {
+      if (
+        snapping &&
+        snapping.snappedGeometry &&
+        snapping.snappedGeometry.type === "Point"
+      ) {
         // We're snapping to a point (corner or midpoint) - use snapped coordinate
         const snappedCoord = snapping.snapCoord(lngLat);
         if (snappedCoord.snapped) {
@@ -1188,19 +1289,32 @@ DirectSelect.onDrag = function(state, e) {
 
       if (!pointSnapFound) {
         // No point snap - apply rail constraint
-        lngLat = constrainToRail(state.dragMoveStartLocation, lngLat, state.railBearing);
+        lngLat = constrainToRail(
+          state.dragMoveStartLocation,
+          lngLat,
+          state.railBearing
+        );
       }
 
       // Update coordinate and skip all other snapping logic
       if (state.selectedCoordPaths.length === 1) {
         this.removeGuideCircle(state);
         removeAllSnapIndicators(this.map);
-        state.feature.updateCoordinate(state.selectedCoordPaths[0], lngLat.lng, lngLat.lat);
+        state.feature.updateCoordinate(
+          state.selectedCoordPaths[0],
+          lngLat.lng,
+          lngLat.lat
+        );
         state.dragMoveLocation = lngLat;
         if (state.dragMoveStartLocation) {
           showMovementVector(this.map, state.dragMoveStartLocation, lngLat);
         }
-        showAdjacentSegmentLengths(this.map, state.feature, state.selectedCoordPaths[0], lngLat);
+        showAdjacentSegmentLengths(
+          this.map,
+          state.feature,
+          state.selectedCoordPaths[0],
+          lngLat
+        );
         return;
       }
     } else {
@@ -1214,11 +1328,15 @@ DirectSelect.onDrag = function(state, e) {
 
     // Handle extended guideline hover detection (similar to draw_line_string_distance)
     if (!shiftHeld) {
-      const intersectionPointInfo = this.detectHoveredIntersectionPoint(state, e);
+      const intersectionPointInfo = this.detectHoveredIntersectionPoint(
+        state,
+        e
+      );
 
       if (intersectionPointInfo) {
         const currentCoord = intersectionPointInfo.coord;
-        const isDifferentPoint = !state.lastHoverPosition ||
+        const isDifferentPoint =
+          !state.lastHoverPosition ||
           state.lastHoverPosition[0] !== currentCoord[0] ||
           state.lastHoverPosition[1] !== currentCoord[1];
 
@@ -1227,17 +1345,22 @@ DirectSelect.onDrag = function(state, e) {
           if (state.extendedGuidelines && state.extendedGuidelines.length > 0) {
             const snapDistance = this._ctx.options.snapDistance || 20;
             const persistenceZone = snapDistance * 5;
-            const pixelDistanceToGuideline = calculatePixelDistanceToExtendedGuidelines(
-              this.map,
-              state.extendedGuidelines,
-              lngLat
-            );
-            keepExistingGuidelines = pixelDistanceToGuideline <= persistenceZone;
+            const pixelDistanceToGuideline =
+              calculatePixelDistanceToExtendedGuidelines(
+                this.map,
+                state.extendedGuidelines,
+                lngLat
+              );
+            keepExistingGuidelines =
+              pixelDistanceToGuideline <= persistenceZone;
           }
 
           if (keepExistingGuidelines) {
             if (intersectionPointInfo.feature && this._ctx.snapping) {
-              this._ctx.snapping.setSnapHoverState(intersectionPointInfo.feature, false);
+              this._ctx.snapping.setSnapHoverState(
+                intersectionPointInfo.feature,
+                false
+              );
             }
             state.isActivelySnappingToGuideline = false;
             state.isInExtendedGuidelinePersistenceZone = true;
@@ -1253,14 +1376,20 @@ DirectSelect.onDrag = function(state, e) {
             state.lastHoverPosition = [currentCoord[0], currentCoord[1]];
 
             state.hoverDebounceTimer = setTimeout(() => {
-              const extendedLines = this.extendGuidelines(state, intersectionPointInfo);
+              const extendedLines = this.extendGuidelines(
+                state,
+                intersectionPointInfo
+              );
               state.extendedGuidelines = extendedLines;
               this.renderExtendedGuidelines(state, extendedLines);
               state.isActivelySnappingToGuideline = true;
               state.isInExtendedGuidelinePersistenceZone = true;
             }, 500);
           }
-        } else if (state.extendedGuidelines && state.extendedGuidelines.length > 0) {
+        } else if (
+          state.extendedGuidelines &&
+          state.extendedGuidelines.length > 0
+        ) {
           state.isActivelySnappingToGuideline = true;
           state.isInExtendedGuidelinePersistenceZone = true;
           this.updateExtendedGuidelinesOpacity(state);
@@ -1269,14 +1398,17 @@ DirectSelect.onDrag = function(state, e) {
         if (state.extendedGuidelines && state.extendedGuidelines.length > 0) {
           const snapDistance = this._ctx.options.snapDistance || 20;
           const persistenceZone = snapDistance * 5;
-          const pixelDistanceToGuideline = calculatePixelDistanceToExtendedGuidelines(
-            this.map,
-            state.extendedGuidelines,
-            lngLat
-          );
+          const pixelDistanceToGuideline =
+            calculatePixelDistanceToExtendedGuidelines(
+              this.map,
+              state.extendedGuidelines,
+              lngLat
+            );
 
-          state.isActivelySnappingToGuideline = state.isHoveringExtendedGuidelines;
-          state.isInExtendedGuidelinePersistenceZone = pixelDistanceToGuideline <= persistenceZone;
+          state.isActivelySnappingToGuideline =
+            state.isHoveringExtendedGuidelines;
+          state.isInExtendedGuidelinePersistenceZone =
+            pixelDistanceToGuideline <= persistenceZone;
 
           this.updateExtendedGuidelinesOpacity(state);
 
@@ -1299,16 +1431,21 @@ DirectSelect.onDrag = function(state, e) {
     }
 
     // Reference point for all distance/bearing calculations
-    const distanceOrigin = state.originalVertexCoord ||
-      [state.dragMoveStartLocation.lng, state.dragMoveStartLocation.lat];
+    const distanceOrigin = state.originalVertexCoord || [
+      state.dragMoveStartLocation.lng,
+      state.dragMoveStartLocation.lat,
+    ];
     const from = turf.point(distanceOrigin);
 
-    const hasUserDistance = state.currentDistance !== null && state.currentDistance > 0;
-    const hasUserAngle = state.currentAngle !== null && !isNaN(state.currentAngle);
+    const hasUserDistance =
+      state.currentDistance !== null && state.currentDistance > 0;
+    const hasUserAngle =
+      state.currentAngle !== null && !isNaN(state.currentAngle);
 
     // Get snap info using the same pattern as draw_line_string_distance
     let snapInfo = null;
-    const extendedGuidelinesActive = state.extendedGuidelines && state.extendedGuidelines.length > 0;
+    const extendedGuidelinesActive =
+      state.extendedGuidelines && state.extendedGuidelines.length > 0;
 
     if (extendedGuidelinesActive) {
       // Check if cursor is near the intersection point that triggered the guidelines
@@ -1317,24 +1454,30 @@ DirectSelect.onDrag = function(state, e) {
         const distToIntersection = turf.distance(
           turf.point(intersectionCoord),
           turf.point([lngLat.lng, lngLat.lat]),
-          { units: 'meters' }
+          { units: "meters" }
         );
-        const metersPerPixel = 156543.03392 * Math.cos(lngLat.lat * Math.PI / 180) / Math.pow(2, this.map.getZoom());
-        const snapToleranceMeters = (this._ctx.options.snapDistance || 20) * metersPerPixel;
+        const metersPerPixel =
+          (156543.03392 * Math.cos((lngLat.lat * Math.PI) / 180)) /
+          Math.pow(2, this.map.getZoom());
+        const snapToleranceMeters =
+          (this._ctx.options.snapDistance || 20) * metersPerPixel;
 
         if (distToIntersection <= snapToleranceMeters) {
           snapInfo = {
-            type: 'point',
+            type: "point",
             coord: intersectionCoord,
-            snappedFeature: state.hoveredIntersectionPoint.feature
+            snappedFeature: state.hoveredIntersectionPoint.feature,
           };
         }
       }
 
       // Check for intersections between extended guidelines and ANY snap lines (proactive search)
       if (!snapInfo) {
-        const metersPerPixel = 156543.03392 * Math.cos(lngLat.lat * Math.PI / 180) / Math.pow(2, this.map.getZoom());
-        const snapToleranceMeters = (this._ctx.options.snapDistance || 20) * metersPerPixel;
+        const metersPerPixel =
+          (156543.03392 * Math.cos((lngLat.lat * Math.PI) / 180)) /
+          Math.pow(2, this.map.getZoom());
+        const snapToleranceMeters =
+          (this._ctx.options.snapDistance || 20) * metersPerPixel;
         const guidelineIntersection = findAllGuidelineIntersections(
           this.map,
           this._ctx.snapping,
@@ -1359,45 +1502,61 @@ DirectSelect.onDrag = function(state, e) {
             const guidelineSnapInfo = this.getSnapInfo(lngLat);
 
             // Query for other line features near the cursor that might intersect the guideline
-            const bufferLayers = snapping.bufferLayers.map(layerId => '_snap_buffer_' + layerId);
+            const bufferLayers = snapping.bufferLayers.map(
+              (layerId) => "_snap_buffer_" + layerId
+            );
             const allFeaturesAtPoint = this.map.queryRenderedFeatures(e.point, {
-              layers: bufferLayers
+              layers: bufferLayers,
             });
 
             // Look for a non-extended-guideline line feature
             const otherLineFeature = allFeaturesAtPoint.find((feature) => {
-              if (feature.properties && feature.properties.isExtendedGuideline) {
+              if (
+                feature.properties &&
+                feature.properties.isExtendedGuideline
+              ) {
                 return false;
               }
               const geomType = feature.geometry.type;
-              return geomType === 'LineString' ||
-                     geomType === 'MultiLineString' ||
-                     geomType === 'Polygon' ||
-                     geomType === 'MultiPolygon';
+              return (
+                geomType === "LineString" ||
+                geomType === "MultiLineString" ||
+                geomType === "Polygon" ||
+                geomType === "MultiPolygon"
+              );
             });
 
             if (otherLineFeature && guidelineSnapInfo) {
               // Found another line - check for intersection with extended guideline
               let otherGeom = otherLineFeature.geometry;
-              if (otherGeom.type === 'Polygon' || otherGeom.type === 'MultiPolygon') {
+              if (
+                otherGeom.type === "Polygon" ||
+                otherGeom.type === "MultiPolygon"
+              ) {
                 otherGeom = turf.polygonToLine(otherGeom).geometry;
               }
 
-              if (otherGeom.type === 'LineString' || otherGeom.type === 'MultiLineString') {
+              if (
+                otherGeom.type === "LineString" ||
+                otherGeom.type === "MultiLineString"
+              ) {
                 const snapPoint = turf.point([lngLat.lng, lngLat.lat]);
-                const coords = otherGeom.type === 'LineString' ? otherGeom.coordinates : otherGeom.coordinates.flat();
+                const coords =
+                  otherGeom.type === "LineString"
+                    ? otherGeom.coordinates
+                    : otherGeom.coordinates.flat();
 
                 const result = findNearestSegment(coords, snapPoint);
                 if (result) {
                   const otherLineSnapInfo = {
-                    type: 'line',
+                    type: "line",
                     coord: guidelineSnapInfo.coord,
                     bearing: turf.bearing(
                       turf.point(result.segment.start),
                       turf.point(result.segment.end)
                     ),
                     segment: result.segment,
-                    snappedFeature: otherLineFeature
+                    snappedFeature: otherLineFeature,
                   };
 
                   const intersectionSnap = findExtendedGuidelineIntersection(
@@ -1421,11 +1580,15 @@ DirectSelect.onDrag = function(state, e) {
             const tempSnapInfo = this.getSnapInfo(lngLat);
             const isSnappingPoint =
               snapping.snappedFeature.properties &&
-              snapping.snappedFeature.properties.type === 'snappingPoint';
+              snapping.snappedFeature.properties.type === "snappingPoint";
 
-            if (isSnappingPoint && tempSnapInfo && tempSnapInfo.type === 'point') {
+            if (
+              isSnappingPoint &&
+              tempSnapInfo &&
+              tempSnapInfo.type === "point"
+            ) {
               snapInfo = tempSnapInfo;
-            } else if (tempSnapInfo && tempSnapInfo.type === 'line') {
+            } else if (tempSnapInfo && tempSnapInfo.type === "line") {
               const intersectionSnap = findExtendedGuidelineIntersection(
                 state.extendedGuidelines,
                 tempSnapInfo,
@@ -1444,8 +1607,15 @@ DirectSelect.onDrag = function(state, e) {
     }
 
     // Calculate mouse bearing and distance
-    const mouseBearing = turf.bearing(from, turf.point([lngLat.lng, lngLat.lat]));
-    const mouseDistance = turf.distance(from, turf.point([lngLat.lng, lngLat.lat]), { units: 'kilometers' });
+    const mouseBearing = turf.bearing(
+      from,
+      turf.point([lngLat.lng, lngLat.lat])
+    );
+    const mouseDistance = turf.distance(
+      from,
+      turf.point([lngLat.lng, lngLat.lat]),
+      { units: "kilometers" }
+    );
 
     const orthogonalTolerance = this._ctx.options.orthogonalSnapTolerance || 5;
     const parallelTolerance = this._ctx.options.parallelSnapTolerance || 5;
@@ -1455,16 +1625,30 @@ DirectSelect.onDrag = function(state, e) {
     let isPerpendicularToGuideline = false;
 
     if (extendedGuidelinesActive) {
-      const guidelineBearings = getExtendedGuidelineBearings(state.extendedGuidelines);
-      orthogonalMatch = getPerpendicularToGuidelineBearing(guidelineBearings, mouseBearing, orthogonalTolerance);
+      const guidelineBearings = getExtendedGuidelineBearings(
+        state.extendedGuidelines
+      );
+      orthogonalMatch = getPerpendicularToGuidelineBearing(
+        guidelineBearings,
+        mouseBearing,
+        orthogonalTolerance
+      );
       if (orthogonalMatch) isPerpendicularToGuideline = true;
     } else if (state.adjacentSegments && state.adjacentSegments.length > 0) {
-      orthogonalMatch = getOrthogonalSnapBearing(state.adjacentSegments, mouseBearing, orthogonalTolerance);
+      orthogonalMatch = getOrthogonalSnapBearing(
+        state.adjacentSegments,
+        mouseBearing,
+        orthogonalTolerance
+      );
     }
 
     // Pixel-based collinear/orthogonal snap with intersection detection
     // Creates extended lines along segment directions and snaps to intersections with other snap lines
-    if (!extendedGuidelinesActive && state.adjacentSegments && state.adjacentSegments.length > 0) {
+    if (
+      !extendedGuidelinesActive &&
+      state.adjacentSegments &&
+      state.adjacentSegments.length > 0
+    ) {
       const snapDistance = this._ctx.options.snapDistance || 20;
       const cursorScreenPos = this.map.project([lngLat.lng, lngLat.lat]);
       const originScreenPos = this.map.project(distanceOrigin);
@@ -1475,12 +1659,16 @@ DirectSelect.onDrag = function(state, e) {
         for (const angle of [0, 90, 180, 270]) {
           const bearing = segmentInfo.bearing + angle;
           const vertexPoint = turf.point(distanceOrigin);
-          const extendedEnd = turf.destination(vertexPoint, 0.5, bearing, { units: 'kilometers' });
+          const extendedEnd = turf.destination(vertexPoint, 0.5, bearing, {
+            units: "kilometers",
+          });
 
           // Create line from origin to extended end
           const lineCoords = [distanceOrigin, extendedEnd.geometry.coordinates];
           const lineScreenStart = originScreenPos;
-          const lineScreenEnd = this.map.project(extendedEnd.geometry.coordinates);
+          const lineScreenEnd = this.map.project(
+            extendedEnd.geometry.coordinates
+          );
 
           extendedLines.push({
             bearing,
@@ -1488,7 +1676,7 @@ DirectSelect.onDrag = function(state, e) {
             screenStart: lineScreenStart,
             screenEnd: lineScreenEnd,
             isCollinear: angle === 0 || angle === 180,
-            segmentInfo
+            segmentInfo,
           });
         }
       }
@@ -1499,9 +1687,12 @@ DirectSelect.onDrag = function(state, e) {
 
       for (const line of extendedLines) {
         const pixelDist = pointToLineSegmentDistancePixels(
-          cursorScreenPos.x, cursorScreenPos.y,
-          line.screenStart.x, line.screenStart.y,
-          line.screenEnd.x, line.screenEnd.y
+          cursorScreenPos.x,
+          cursorScreenPos.y,
+          line.screenStart.x,
+          line.screenStart.y,
+          line.screenEnd.x,
+          line.screenEnd.y
         );
 
         if (pixelDist < closestPixelDist && pixelDist <= snapDistance) {
@@ -1515,26 +1706,39 @@ DirectSelect.onDrag = function(state, e) {
         const snapping = this._ctx.snapping;
         if (snapping && snapping.snappedGeometry) {
           const geom = snapping.snappedGeometry;
-          if (geom.type === 'LineString' || geom.type === 'MultiLineString') {
+          if (geom.type === "LineString" || geom.type === "MultiLineString") {
             try {
               // Create extended line for intersection test (extend in both directions)
               const vertexPoint = turf.point(distanceOrigin);
-              const extStart = turf.destination(vertexPoint, 0.5, closestLine.bearing + 180, { units: 'kilometers' });
-              const extEnd = turf.destination(vertexPoint, 0.5, closestLine.bearing, { units: 'kilometers' });
+              const extStart = turf.destination(
+                vertexPoint,
+                0.5,
+                closestLine.bearing + 180,
+                { units: "kilometers" }
+              );
+              const extEnd = turf.destination(
+                vertexPoint,
+                0.5,
+                closestLine.bearing,
+                { units: "kilometers" }
+              );
               const extendedLine = turf.lineString([
                 extStart.geometry.coordinates,
                 distanceOrigin,
-                extEnd.geometry.coordinates
+                extEnd.geometry.coordinates,
               ]);
 
               let snappedLine;
-              if (geom.type === 'LineString') {
+              if (geom.type === "LineString") {
                 snappedLine = turf.lineString(geom.coordinates);
               } else {
                 snappedLine = turf.multiLineString(geom.coordinates);
               }
 
-              const intersections = turf.lineIntersect(extendedLine, snappedLine);
+              const intersections = turf.lineIntersect(
+                extendedLine,
+                snappedLine
+              );
               if (intersections.features.length > 0) {
                 // Find closest intersection to cursor
                 const cursorPoint = turf.point([lngLat.lng, lngLat.lat]);
@@ -1542,7 +1746,9 @@ DirectSelect.onDrag = function(state, e) {
                 let minDist = Infinity;
 
                 for (const intersection of intersections.features) {
-                  const dist = turf.distance(cursorPoint, intersection, { units: 'meters' });
+                  const dist = turf.distance(cursorPoint, intersection, {
+                    units: "meters",
+                  });
                   if (dist < minDist) {
                     minDist = dist;
                     closestIntersection = intersection.geometry.coordinates;
@@ -1550,15 +1756,17 @@ DirectSelect.onDrag = function(state, e) {
                 }
 
                 // Snap to intersection if cursor is within snap tolerance
-                const metersPerPixel = 156543.03392 * Math.cos(lngLat.lat * Math.PI / 180) / Math.pow(2, this.map.getZoom());
+                const metersPerPixel =
+                  (156543.03392 * Math.cos((lngLat.lat * Math.PI) / 180)) /
+                  Math.pow(2, this.map.getZoom());
                 const snapToleranceMeters = snapDistance * metersPerPixel;
 
                 if (closestIntersection && minDist <= snapToleranceMeters) {
                   snapInfo = {
-                    type: 'point',
+                    type: "point",
                     coord: closestIntersection,
                     snappedFeature: snapping.snappedFeature,
-                    isCollinearIntersection: true
+                    isCollinearIntersection: true,
                   };
                 }
               }
@@ -1586,26 +1794,41 @@ DirectSelect.onDrag = function(state, e) {
       const closestX = x1 + t * dx;
       const closestY = y1 + t * dy;
 
-      return Math.sqrt((px - closestX) * (px - closestX) + (py - closestY) * (py - closestY));
+      return Math.sqrt(
+        (px - closestX) * (px - closestX) + (py - closestY) * (py - closestY)
+      );
     }
 
     // Check parallel line snap (only when extended guidelines are NOT active)
     let parallelLineMatch = null;
     if (!extendedGuidelinesActive) {
-      const nearbyLines = findNearbyParallelLines(this._ctx, this.map, distanceOrigin, lngLat);
-      parallelLineMatch = getParallelBearing(nearbyLines, mouseBearing, parallelTolerance);
+      const nearbyLines = findNearbyParallelLines(
+        this._ctx,
+        this.map,
+        distanceOrigin,
+        lngLat
+      );
+      parallelLineMatch = getParallelBearing(
+        nearbyLines,
+        mouseBearing,
+        parallelTolerance
+      );
     }
 
     // Check perpendicular-to-line snap (only when extended guidelines are NOT active)
     let perpendicularToLineSnap = null;
-    if (!extendedGuidelinesActive && snapInfo && snapInfo.type === 'line') {
-      const perpPoint = calculatePerpendicularToLine(distanceOrigin, snapInfo.segment, lngLat);
+    if (!extendedGuidelinesActive && snapInfo && snapInfo.type === "line") {
+      const perpPoint = calculatePerpendicularToLine(
+        distanceOrigin,
+        snapInfo.segment,
+        lngLat
+      );
       if (perpPoint) {
         perpendicularToLineSnap = {
           coord: perpPoint.coord,
           distanceFromCursor: perpPoint.distanceFromCursor,
           lineSegment: snapInfo.segment,
-          lineBearing: snapInfo.bearing
+          lineBearing: snapInfo.bearing,
         };
       }
     }
@@ -1618,32 +1841,56 @@ DirectSelect.onDrag = function(state, e) {
       lastVertex: distanceOrigin,
       lngLat,
       closingPerpendicularSnap: null,
-      proximityThreshold: this._ctx.options.parallelSnapProximityThreshold || 10,
-      mouseBearing
+      proximityThreshold:
+        this._ctx.options.parallelSnapProximityThreshold || 10,
+      mouseBearing,
     });
     orthogonalMatch = resolved.orthogonalMatch;
     parallelLineMatch = resolved.parallelLineMatch;
 
     // Check if perpendicular-to-line snap should override
     const snapTolerance = this._ctx.options.snapDistance || 20;
-    const metersPerPixel = 156543.03392 * Math.cos(lngLat.lat * Math.PI / 180) / Math.pow(2, this.map.getZoom());
+    const metersPerPixel =
+      (156543.03392 * Math.cos((lngLat.lat * Math.PI) / 180)) /
+      Math.pow(2, this.map.getZoom());
     const snapToleranceMeters = snapTolerance * metersPerPixel;
 
     let isPerpendicularToLineSnap = false;
-    if (perpendicularToLineSnap && perpendicularToLineSnap.distanceFromCursor <= snapToleranceMeters) {
+    if (
+      perpendicularToLineSnap &&
+      perpendicularToLineSnap.distanceFromCursor <= snapToleranceMeters
+    ) {
       let shouldUsePerpendicular = true;
 
       if (orthogonalMatch !== null) {
-        const orthogonalPoint = turf.destination(from, 0.1, orthogonalMatch.bearing, { units: 'kilometers' });
-        const orthogonalDist = turf.distance(turf.point([lngLat.lng, lngLat.lat]), orthogonalPoint, { units: 'meters' });
+        const orthogonalPoint = turf.destination(
+          from,
+          0.1,
+          orthogonalMatch.bearing,
+          { units: "kilometers" }
+        );
+        const orthogonalDist = turf.distance(
+          turf.point([lngLat.lng, lngLat.lat]),
+          orthogonalPoint,
+          { units: "meters" }
+        );
         if (orthogonalDist < perpendicularToLineSnap.distanceFromCursor) {
           shouldUsePerpendicular = false;
         }
       }
 
       if (shouldUsePerpendicular && parallelLineMatch !== null) {
-        const parallelPoint = turf.destination(from, 0.1, parallelLineMatch.bearing, { units: 'kilometers' });
-        const parallelDist = turf.distance(turf.point([lngLat.lng, lngLat.lat]), parallelPoint, { units: 'meters' });
+        const parallelPoint = turf.destination(
+          from,
+          0.1,
+          parallelLineMatch.bearing,
+          { units: "kilometers" }
+        );
+        const parallelDist = turf.distance(
+          turf.point([lngLat.lng, lngLat.lat]),
+          parallelPoint,
+          { units: "meters" }
+        );
         if (parallelDist < perpendicularToLineSnap.distanceFromCursor) {
           shouldUsePerpendicular = false;
         }
@@ -1651,9 +1898,9 @@ DirectSelect.onDrag = function(state, e) {
 
       if (shouldUsePerpendicular) {
         snapInfo = {
-          type: 'point',
+          type: "point",
           coord: perpendicularToLineSnap.coord,
-          snappedFeature: snapInfo.snappedFeature
+          snappedFeature: snapInfo.snappedFeature,
         };
         isPerpendicularToLineSnap = true;
         orthogonalMatch = null;
@@ -1669,13 +1916,16 @@ DirectSelect.onDrag = function(state, e) {
 
     if (hasUserAngle) {
       bearingToUse = state.currentAngle;
-    } else if (snapInfo && snapInfo.type === 'point') {
+    } else if (snapInfo && snapInfo.type === "point") {
       bearingToUse = turf.bearing(from, turf.point(snapInfo.coord));
       usePointDirection = true;
-    } else if (snapInfo && snapInfo.type === 'line') {
+    } else if (snapInfo && snapInfo.type === "line") {
       // Line snap takes priority over bearing-based snaps
       bearingToUse = snapInfo.bearing;
-    } else if (orthogonalMatch !== null && (!extendedGuidelinesActive || isPerpendicularToGuideline)) {
+    } else if (
+      orthogonalMatch !== null &&
+      (!extendedGuidelinesActive || isPerpendicularToGuideline)
+    ) {
       // Bearing snap only activates when no concrete snap target nearby
       bearingToUse = orthogonalMatch.bearing;
       isOrthogonalSnap = true;
@@ -1693,9 +1943,9 @@ DirectSelect.onDrag = function(state, e) {
     if (hasUserDistance) {
       this.updateGuideCircle(state, distanceOrigin, state.currentDistance);
 
-      if (snapInfo && snapInfo.type === 'point') {
+      if (snapInfo && snapInfo.type === "point") {
         finalLngLat = { lng: snapInfo.coord[0], lat: snapInfo.coord[1] };
-      } else if (snapInfo && snapInfo.type === 'line') {
+      } else if (snapInfo && snapInfo.type === "line") {
         const circleLineIntersection = calculateCircleLineIntersection(
           distanceOrigin,
           state.currentDistance,
@@ -1703,25 +1953,49 @@ DirectSelect.onDrag = function(state, e) {
           [lngLat.lng, lngLat.lat]
         );
         if (circleLineIntersection) {
-          finalLngLat = { lng: circleLineIntersection.coord[0], lat: circleLineIntersection.coord[1] };
+          finalLngLat = {
+            lng: circleLineIntersection.coord[0],
+            lat: circleLineIntersection.coord[1],
+          };
         } else {
-          const dest = turf.destination(from, state.currentDistance / 1000, bearingToUse, { units: 'kilometers' });
-          finalLngLat = { lng: dest.geometry.coordinates[0], lat: dest.geometry.coordinates[1] };
+          const dest = turf.destination(
+            from,
+            state.currentDistance / 1000,
+            bearingToUse,
+            { units: "kilometers" }
+          );
+          finalLngLat = {
+            lng: dest.geometry.coordinates[0],
+            lat: dest.geometry.coordinates[1],
+          };
         }
       } else {
-        const dest = turf.destination(from, state.currentDistance / 1000, bearingToUse, { units: 'kilometers' });
-        finalLngLat = { lng: dest.geometry.coordinates[0], lat: dest.geometry.coordinates[1] };
+        const dest = turf.destination(
+          from,
+          state.currentDistance / 1000,
+          bearingToUse,
+          { units: "kilometers" }
+        );
+        finalLngLat = {
+          lng: dest.geometry.coordinates[0],
+          lat: dest.geometry.coordinates[1],
+        };
       }
     } else if (usePointDirection && snapInfo) {
       this.removeGuideCircle(state);
       finalLngLat = { lng: snapInfo.coord[0], lat: snapInfo.coord[1] };
-    } else if (snapInfo && snapInfo.type === 'line') {
+    } else if (snapInfo && snapInfo.type === "line") {
       this.removeGuideCircle(state);
       finalLngLat = { lng: snapInfo.coord[0], lat: snapInfo.coord[1] };
     } else if (isOrthogonalSnap || isParallelLineSnap) {
       this.removeGuideCircle(state);
-      const dest = turf.destination(from, mouseDistance, bearingToUse, { units: 'kilometers' });
-      finalLngLat = { lng: dest.geometry.coordinates[0], lat: dest.geometry.coordinates[1] };
+      const dest = turf.destination(from, mouseDistance, bearingToUse, {
+        units: "kilometers",
+      });
+      finalLngLat = {
+        lng: dest.geometry.coordinates[0],
+        lat: dest.geometry.coordinates[1],
+      };
     } else {
       this.removeGuideCircle(state);
       finalLngLat = lngLat;
@@ -1733,18 +2007,33 @@ DirectSelect.onDrag = function(state, e) {
 
     if (isOrthogonalSnap && orthogonalMatch) {
       state.currentOrthogonalMatch = orthogonalMatch;
-      const isCollinear = orthogonalMatch.angleFromReference === 0 || orthogonalMatch.angleFromReference === 180;
+      const isCollinear =
+        orthogonalMatch.angleFromReference === 0 ||
+        orthogonalMatch.angleFromReference === 180;
       if (isCollinear) {
-        showCollinearSnapLine(this.map, distanceOrigin, orthogonalMatch.referenceBearing);
+        showCollinearSnapLine(
+          this.map,
+          distanceOrigin,
+          orthogonalMatch.referenceBearing
+        );
         removeRightAngleIndicator(this.map);
       } else {
-        showRightAngleIndicator(this.map, distanceOrigin, orthogonalMatch.referenceBearing, orthogonalMatch.bearing);
+        showRightAngleIndicator(
+          this.map,
+          distanceOrigin,
+          orthogonalMatch.referenceBearing,
+          orthogonalMatch.bearing
+        );
         removeCollinearSnapLine(this.map);
       }
       removeParallelLineIndicator(this.map);
     } else if (isParallelLineSnap && parallelLineMatch) {
       state.currentParallelMatch = parallelLineMatch;
-      showParallelLineIndicator(this.map, distanceOrigin, parallelLineMatch.bearing);
+      showParallelLineIndicator(
+        this.map,
+        distanceOrigin,
+        parallelLineMatch.bearing
+      );
       removeRightAngleIndicator(this.map);
       removeCollinearSnapLine(this.map);
     } else {
@@ -1752,14 +2041,17 @@ DirectSelect.onDrag = function(state, e) {
     }
 
     lngLat = finalLngLat;
-    state.feature.updateCoordinate(state.selectedCoordPaths[0], lngLat.lng, lngLat.lat);
-
+    state.feature.updateCoordinate(
+      state.selectedCoordPaths[0],
+      lngLat.lng,
+      lngLat.lat
+    );
   } else {
     // Multiple vertices or feature dragging
     this.removeGuideCircle(state);
     const delta = {
       lng: lngLat.lng - state.dragMoveLocation.lng,
-      lat: lngLat.lat - state.dragMoveLocation.lat
+      lat: lngLat.lat - state.dragMoveLocation.lat,
     };
 
     if (state.selectedCoordPaths.length > 0) this.dragVertex(state, e, delta);
@@ -1773,31 +2065,43 @@ DirectSelect.onDrag = function(state, e) {
   }
 
   if (state.selectedCoordPaths.length === 1) {
-    showAdjacentSegmentLengths(this.map, state.feature, state.selectedCoordPaths[0], lngLat);
+    showAdjacentSegmentLengths(
+      this.map,
+      state.feature,
+      state.selectedCoordPaths[0],
+      lngLat
+    );
   } else {
     removeAdjacentSegmentLengths(this.map);
   }
 };
 
-DirectSelect.onClick = function(state, e) {
+DirectSelect.onClick = function (state, e) {
   if (noTarget(e)) return this.clickNoTarget(state, e);
   if (isActiveFeature(e)) return this.clickActiveFeature(state, e);
+  if (e.featureTarget?.properties?.user_isEditGeometry) return;
   if (isInactiveFeature(e)) return this.clickInactive(state, e);
   this.stopDragging(state);
 };
 
-DirectSelect.onTap = function(state, e) {
+DirectSelect.onTap = function (state, e) {
   if (noTarget(e)) return this.clickNoTarget(state, e);
   if (isActiveFeature(e)) return this.clickActiveFeature(state, e);
+  if (e.featureTarget?.properties?.user_isEditGeometry) return;
   if (isInactiveFeature(e)) return this.clickInactive(state, e);
 };
 
-DirectSelect.onTouchEnd = DirectSelect.onMouseUp = function(state) {
+DirectSelect.onTouchEnd = DirectSelect.onMouseUp = function (state) {
   if (state.dragMoving) {
+    if (
+      state.selectedCoordPaths.length === 0 &&
+      state.feature.properties.isEditGeometry
+    ) {
+      state.feature.setProperty("hideVertices", true);
+    }
     this.fireUpdate();
   }
   this.stopDragging(state);
 };
 
 export default DirectSelect;
-
