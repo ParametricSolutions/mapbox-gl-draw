@@ -1112,8 +1112,7 @@ DirectSelect.toDisplayFeatures = function (state, geojson, push) {
     push(geojson);
     const hideVertices =
       state.feature.properties.isEditGeometry &&
-      ((state.dragMoving && state.selectedCoordPaths.length === 0) ||
-        geojson.properties.user_hideVertices);
+      (state.dragMoving || geojson.properties.user_hideVertices);
     if (!hideVertices) {
       createSupplementaryPoints(geojson, {
         map: this.map,
@@ -2093,10 +2092,7 @@ DirectSelect.onTap = function (state, e) {
 
 DirectSelect.onTouchEnd = DirectSelect.onMouseUp = function (state) {
   if (state.dragMoving) {
-    if (
-      state.selectedCoordPaths.length === 0 &&
-      state.feature.properties.isEditGeometry
-    ) {
+    if (state.feature.properties.isEditGeometry) {
       state.feature.setProperty("hideVertices", true);
     }
     this.fireUpdate();
