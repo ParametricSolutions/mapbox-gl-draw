@@ -5,6 +5,9 @@ import draw_polygon from './draw_polygon.js';
 import draw_line_string from './draw_line_string.js';
 import draw_line_string_distance from './draw_line_string_distance.js';
 import draw_polygon_distance from './draw_polygon_distance.js';
+import { SRMode as scale_rotate, SRCenter } from './scale_rotate.js';
+
+export { SRCenter };
 
 export default {
   simple_select,
@@ -14,4 +17,5 @@ export default {
   draw_line_string,
   draw_line_string_distance,
   draw_polygon_distance,
+  scale_rotate,
 };

@@ -2,6 +2,7 @@ import runSetup from './src/setup.js';
 import setupOptions from './src/options.js';
 import setupAPI from './src/api.js';
 import modes from './src/modes/index.js';
+import { SRCenter } from './src/modes/index.js';
 import * as Constants from './src/constants.js';
 import * as lib from './src/lib/index.js';
 import './dist/mapbox-gl-draw.css';
@@ -35,3 +36,4 @@ MapboxDraw.constants = Constants;
 MapboxDraw.lib = lib;
 
 export default MapboxDraw;
+export { SRCenter };
