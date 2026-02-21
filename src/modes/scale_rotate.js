@@ -120,6 +120,7 @@ SRMode.toDisplayFeatures = function (state, geojson, push) {
 SRMode.onStop = function () {
   doubleClickZoom.enable(this);
   this.clearSelectedCoordinates();
+  this.removeRotationIndicator();
 };
 
 SRMode.pathsToCoordinates = function (featureId, paths) {
@@ -149,10 +150,19 @@ SRMode.computeBisectrix = function (points) {
 
 SRMode._createRotationPoint = function (rotationWidgets, featureId, v1, v2, rotCenter, radiusScale) {
   var cR0 = midpoint(v1, v2).geometry.coordinates;
-  var heading0 = bearing(rotCenter, cR0);
   var distance0 = distance(rotCenter, cR0);
-  var distance1 = radiusScale * distance0;
-  var cR1 = destination(rotCenter, distance1, bearing(rotCenter, cR0), {}).geometry.coordinates;
+
+  var heading0, distance1, cR1;
+  if (distance0 < 0.001) {
+    heading0 = bearing(rotCenter, v1.geometry.coordinates);
+    var endpointDist = distance(rotCenter, point(v1.geometry.coordinates));
+    distance1 = radiusScale * endpointDist;
+    cR1 = destination(rotCenter, distance1, heading0, {}).geometry.coordinates;
+  } else {
+    heading0 = bearing(rotCenter, cR0);
+    distance1 = radiusScale * distance0;
+    cR1 = destination(rotCenter, distance1, heading0, {}).geometry.coordinates;
+  }
 
   rotationWidgets.push({
     type: Constants.geojsonTypes.FEATURE,
@@ -207,10 +217,132 @@ SRMode.createRotationPoints = function (state, geojson, suppPoints) {
   return rotationWidgets;
 };
 
+SRMode.initRotationIndicator = function () {
+  const map = this.map;
+  const emptyFC = { type: 'FeatureCollection', features: [] };
+
+  if (!map.getSource('rotation-indicator-lines')) {
+    map.addSource('rotation-indicator-lines', { type: 'geojson', data: emptyFC });
+    map.addLayer({
+      id: 'rotation-indicator-lines',
+      type: 'line',
+      source: 'rotation-indicator-lines',
+      paint: {
+        'line-color': '#000000',
+        'line-width': 1,
+        'line-opacity': 0.3,
+        'line-dasharray': [4, 4],
+      },
+    });
+  }
+
+  if (!map.getSource('rotation-indicator-label')) {
+    map.addSource('rotation-indicator-label', { type: 'geojson', data: emptyFC });
+    map.addLayer({
+      id: 'rotation-indicator-label',
+      type: 'symbol',
+      source: 'rotation-indicator-label',
+      layout: {
+        'text-field': ['get', 'angle'],
+        'text-size': 10,
+        'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+        'text-anchor': 'center',
+        'text-allow-overlap': true,
+        'text-ignore-placement': true,
+        'text-rotation-alignment': 'viewport',
+        'text-pitch-alignment': 'viewport',
+      },
+      paint: {
+        'text-color': '#000000',
+        'text-opacity': 1,
+      },
+    });
+  }
+};
+
+SRMode.updateRotationIndicator = function (centerCoord, heading0, rotateAngle, mouseCoord) {
+  const map = this.map;
+
+  let displayAngle = rotateAngle;
+  while (displayAngle > 180) displayAngle -= 360;
+  while (displayAngle < -180) displayAngle += 360;
+
+  if (Math.abs(displayAngle) < 0.5) {
+    this.clearRotationIndicator();
+    return;
+  }
+
+  const centerPt = point(centerCoord);
+  const dist = distance(centerPt, point(mouseCoord), { units: 'kilometers' });
+
+  if (dist < 0.001) {
+    this.clearRotationIndicator();
+    return;
+  }
+
+  const originEnd = destination(centerPt, dist, heading0, { units: 'kilometers' });
+  const originLine = lineString([centerCoord, originEnd.geometry.coordinates]);
+
+  const currentBearing = heading0 + displayAngle;
+  const currentEnd = destination(centerPt, dist, currentBearing, { units: 'kilometers' });
+  const currentLine = lineString([centerCoord, currentEnd.geometry.coordinates]);
+
+  const arcRadius = dist * 0.15;
+  const arcSteps = Math.max(Math.round(Math.abs(displayAngle) / 3), 12);
+  const arcCoords = [];
+  for (let i = 0; i <= arcSteps; i++) {
+    const t = i / arcSteps;
+    const a = heading0 + t * displayAngle;
+    const pt = destination(centerPt, arcRadius, a, { units: 'kilometers' });
+    arcCoords.push(pt.geometry.coordinates);
+  }
+  const arcLine = lineString(arcCoords);
+
+  map.getSource('rotation-indicator-lines').setData({
+    type: 'FeatureCollection',
+    features: [originLine, currentLine, arcLine],
+  });
+
+  const bisectorBearing = heading0 + displayAngle / 2;
+  const labelDist = arcRadius * 1.8;
+  const labelPt = destination(centerPt, labelDist, bisectorBearing, { units: 'kilometers' });
+
+  map.getSource('rotation-indicator-label').setData({
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        properties: { angle: `${Math.round(displayAngle)}°` },
+        geometry: labelPt.geometry,
+      },
+    ],
+  });
+};
+
+SRMode.clearRotationIndicator = function () {
+  const map = this.map;
+  const emptyFC = { type: 'FeatureCollection', features: [] };
+  if (map.getSource('rotation-indicator-lines')) {
+    map.getSource('rotation-indicator-lines').setData(emptyFC);
+  }
+  if (map.getSource('rotation-indicator-label')) {
+    map.getSource('rotation-indicator-label').setData(emptyFC);
+  }
+};
+
+SRMode.removeRotationIndicator = function () {
+  const map = this.map;
+  ['rotation-indicator-label', 'rotation-indicator-lines'].forEach((id) => {
+    if (map.getLayer(id)) map.removeLayer(id);
+    if (map.getSource(id)) map.removeSource(id);
+  });
+};
+
 SRMode.startDragging = function (state, e) {
   this.map.dragPan.disable();
   state.canDragMove = true;
   state.dragMoveLocation = e.lngLat;
+  this.map.fire('draw.dragstart');
 };
 
 SRMode.stopDragging = function (state) {
@@ -218,6 +350,7 @@ SRMode.stopDragging = function (state) {
   state.dragMoving = false;
   state.canDragMove = false;
   state.dragMoveLocation = null;
+  this.clearRotationIndicator();
 };
 
 SRMode.onTouchStart = SRMode.onMouseDown = function (state, e) {
@@ -236,6 +369,7 @@ SRMode.onVertex = function (state, e) {
 
 SRMode.onRotatePoint = function (state, e) {
   this.computeAxes(state, state.feature.toGeoJSON());
+  this.initRotationIndicator();
   this.startDragging(state, e);
   const about = e.featureTarget.properties;
   state.selectedCoordPaths = [about.coord_path];
@@ -386,13 +520,14 @@ SRMode.dragRotatePoint = function (state, e) {
     rotateAngle = 5.0 * Math.round(rotateAngle / 5.0);
   }
 
+  this.updateRotationIndicator(cCenter, heading0, rotateAngle, [e.lngLat.lng, e.lngLat.lat]);
+
   var rotatedFeature = transformRotate(state.rotation.feature0, rotateAngle, {
     pivot: rotCenter,
     mutate: false,
   });
 
   state.feature.incomingCoords(rotatedFeature.geometry.coordinates);
-  this.fireUpdate();
 };
 
 SRMode.dragScalePoint = function (state, e) {
@@ -418,13 +553,11 @@ SRMode.dragScalePoint = function (state, e) {
   });
 
   state.feature.incomingCoords(scaledFeature.geometry.coordinates);
-  this.fireUpdate();
 };
 
 SRMode.dragFeature = function (state, e, delta) {
   moveFeatures(this.getSelected(), delta);
   state.dragMoveLocation = e.lngLat;
-  this.fireUpdate();
 };
 
 SRMode.fireUpdate = function () {
