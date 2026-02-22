@@ -3,6 +3,10 @@ import doubleClickZoom from '../lib/double_click_zoom.js';
 import createSupplementaryPoints from '../lib/create_supplementary_points.js';
 import * as CommonSelectors from '../lib/common_selectors.js';
 import moveFeatures from '../lib/move_features.js';
+import {
+  showMovementVector,
+  removeMovementVector,
+} from '../lib/movement_vector.js';
 
 import { lineString, point } from '@turf/helpers';
 import bearing from '@turf/bearing';
@@ -121,6 +125,7 @@ SRMode.onStop = function () {
   doubleClickZoom.enable(this);
   this.clearSelectedCoordinates();
   this.removeRotationIndicator();
+  removeMovementVector(this.map);
 };
 
 SRMode.pathsToCoordinates = function (featureId, paths) {
@@ -342,6 +347,7 @@ SRMode.startDragging = function (state, e) {
   this.map.dragPan.disable();
   state.canDragMove = true;
   state.dragMoveLocation = e.lngLat;
+  state.dragMoveStartLocation = e.lngLat;
   this.map.fire('draw.dragstart');
 };
 
@@ -350,7 +356,9 @@ SRMode.stopDragging = function (state) {
   state.dragMoving = false;
   state.canDragMove = false;
   state.dragMoveLocation = null;
+  state.dragMoveStartLocation = null;
   this.clearRotationIndicator();
+  removeMovementVector(this.map);
 };
 
 SRMode.onTouchStart = SRMode.onMouseDown = function (state, e) {
@@ -564,6 +572,7 @@ SRMode.dragScalePoint = function (state, e) {
 SRMode.dragFeature = function (state, e, delta) {
   moveFeatures(this.getSelected(), delta);
   state.dragMoveLocation = e.lngLat;
+  showMovementVector(this.map, state.dragMoveStartLocation, e.lngLat);
 };
 
 SRMode.fireUpdate = function () {
