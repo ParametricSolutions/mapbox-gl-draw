@@ -34,6 +34,11 @@ export default class Snapping {
       this.setDisabled(disabled);
     };
 
+    this.ctx.api.setSnapDistance = (distance) => {
+      this.ctx.options.snapDistance = distance;
+      this.rebuildBufferLayers();
+    };
+
     this.map.on("styledata", () => {
       this.updateSnapLayers();
     });
@@ -41,6 +46,14 @@ export default class Snapping {
     this.mouseoverHandler = this.mouseoverHandler.bind(this);
     this.mouseoutHandler = this.mouseoutHandler.bind(this);
   }
+
+  rebuildBufferLayers = () => {
+    const currentLayers = [...this.bufferLayers];
+    currentLayers.forEach((l) => this.removeSnapBuffer(l));
+    this.bufferLayers = [];
+    currentLayers.forEach((l) => this.addSnapBuffer(l));
+    this.bufferLayers = currentLayers;
+  };
 
   updateSnapLayers = () => {
     const newLayers = this.snappableLayers();
@@ -61,6 +74,7 @@ export default class Snapping {
     if (this.disabled) {
       return;
     }
+    
 
     const f = !this.ctx.options.snapFeatureFilter
       ? e.features[0]
