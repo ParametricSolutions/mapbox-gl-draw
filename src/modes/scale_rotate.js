@@ -520,6 +520,12 @@ SRMode.dragRotatePoint = function (state, e) {
     rotateAngle = 5.0 * Math.round(rotateAngle / 5.0);
   }
 
+  var snapTolerance = (this._ctx && this._ctx.options && this._ctx.options.orthogonalSnapTolerance) || 5;
+  var nearestRight = 90 * Math.round(rotateAngle / 90);
+  if (Math.abs(rotateAngle - nearestRight) <= snapTolerance) {
+    rotateAngle = nearestRight;
+  }
+
   this.updateRotationIndicator(cCenter, heading0, rotateAngle, [e.lngLat.lng, e.lngLat.lat]);
 
   var rotatedFeature = transformRotate(state.rotation.feature0, rotateAngle, {
