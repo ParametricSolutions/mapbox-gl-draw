@@ -935,9 +935,31 @@ DirectSelect.onMidpoint = function (state, e) {
   this.startDragging(state, e);
   const about = e.featureTarget.properties;
   state.feature.addCoordinate(about.coord_path, about.lng, about.lat);
-  this.fireUpdate();
   state.selectedCoordPaths = [about.coord_path];
+
+  // Defer fireUpdate to mouseup/click so the feature update cycle doesn't
+  // deselect the point and break click+drag in one motion
+  state.midpointAdded = true;
+
+  // Clear rail edge — the midpoint was on an edge but the newly created vertex
+  // should be freely draggable, not constrained to the parent edge direction
+  state.railEdge = null;
+
+  const vertexCoord = state.feature.getCoordinate(about.coord_path);
+  state.originalVertexCoord = vertexCoord;
+
+  state.adjacentSegments = getAdjacentSegmentBearings(
+    state.feature,
+    about.coord_path
+  );
+
   this.showDistanceAngleUI(state);
+
+  const selectedCoordinates = this.pathsToCoordinates(
+    state.featureId,
+    state.selectedCoordPaths
+  );
+  this.setSelectedCoordinates(selectedCoordinates);
 };
 
 DirectSelect.pathsToCoordinates = function (featureId, paths) {
@@ -2076,6 +2098,10 @@ DirectSelect.onDrag = function (state, e) {
 };
 
 DirectSelect.onClick = function (state, e) {
+  if (state.midpointAdded) {
+    this.fireUpdate();
+    state.midpointAdded = false;
+  }
   if (noTarget(e)) return this.clickNoTarget(state, e);
   if (isActiveFeature(e)) return this.clickActiveFeature(state, e);
   if (e.featureTarget?.properties?.user_isEditGeometry) return;
@@ -2091,11 +2117,12 @@ DirectSelect.onTap = function (state, e) {
 };
 
 DirectSelect.onTouchEnd = DirectSelect.onMouseUp = function (state) {
-  if (state.dragMoving) {
-    if (state.feature.properties.isEditGeometry) {
+  if (state.dragMoving || state.midpointAdded) {
+    if (state.dragMoving && state.feature.properties.isEditGeometry) {
       state.feature.setProperty("hideVertices", true);
     }
     this.fireUpdate();
+    state.midpointAdded = false;
   }
   this.stopDragging(state);
 };
