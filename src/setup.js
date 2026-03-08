@@ -32,6 +32,7 @@ export default function (ctx) {
       return this;
     },
     connect() {
+      if (!ctx.map) return;
       ctx.map.off("load", setup.connect);
       clearInterval(mapLoadedInterval);
       setup.addLayers();
