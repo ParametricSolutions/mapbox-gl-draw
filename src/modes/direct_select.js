@@ -28,6 +28,8 @@ import {
   removeRailIndicator,
 } from "../lib/rail_constraint.js";
 import {
+  setupSnapIndicatorSources,
+  teardownSnapIndicatorSources,
   showRightAngleIndicator,
   removeRightAngleIndicator,
   showCollinearSnapLine,
@@ -1089,6 +1091,9 @@ DirectSelect.onSetup = function (opts) {
     trash: true,
   });
 
+  // Create persistent snap indicator sources
+  setupSnapIndicatorSources(this.map);
+
   // Create distance/angle input UI
   this.createDistanceInput(state);
   this.createAngleInput(state);
@@ -1119,6 +1124,7 @@ DirectSelect.onStop = function (state) {
   removeMovementVector(this.map);
   removeRailIndicator(this.map);
   removeAllSnapIndicators(this.map);
+  teardownSnapIndicatorSources(this.map);
   removeAdjacentSegmentLengths(this.map);
   removeAllSegmentLengths(this.map);
   // Clean up distance/angle input UI and extended guidelines

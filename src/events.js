@@ -44,8 +44,13 @@ export default function(ctx) {
     if (button === 1) {
       return events.mousedrag(event);
     }
-    const target = getFeaturesAndSetCursor(event, ctx);
-    event.featureTarget = target;
+    if (currentModeName.indexOf('draw') !== -1) {
+      ctx.ui.queueMapClasses({ mouse: Constants.cursors.ADD });
+      ctx.ui.updateMapClasses();
+    } else {
+      const target = getFeaturesAndSetCursor(event, ctx);
+      event.featureTarget = target;
+    }
     currentMode.mousemove(event);
   };
 

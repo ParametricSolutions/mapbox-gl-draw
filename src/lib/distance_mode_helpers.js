@@ -1,4 +1,5 @@
 import * as turf from '@turf/turf';
+import { fastBearing, fastDistance, fastDestination } from './fast_math.js';
 
 // Reusable unit options to avoid object allocation
 const UNITS_METERS = { units: 'meters' };
@@ -108,10 +109,7 @@ export function getUnderlyingLineBearing(ctx, map, e, snappedCoord) {
     return null;
   }
 
-  const bearing = turf.bearing(
-    turf.point(result.segment.start),
-    turf.point(result.segment.end)
-  );
+  const bearing = fastBearing(result.segment.start, result.segment.end);
 
   return {
     bearing: bearing,
@@ -167,34 +165,24 @@ export function getAdjacentSegmentsAtVertex(ctx, map, e, snappedCoord) {
 
     // Check if snap point is very close to a vertex (corner)
     for (let i = 0; i < coords.length; i++) {
-      const vertexDist = turf.distance(snapPoint, turf.point(coords[i]), { units: 'meters' });
+      const vertexDist = fastDistance(snapPoint.geometry.coordinates, coords[i]);
       if (vertexDist < VERTEX_TOLERANCE) {
-        // This is a corner point - get both adjacent segments
-
-        // Previous segment (from previous vertex to this vertex)
         if (i > 0) {
           const prevSegment = { start: coords[i - 1], end: coords[i] };
-          const prevBearing = turf.bearing(turf.point(prevSegment.start), turf.point(prevSegment.end));
-          segments.push({ bearing: prevBearing, segment: prevSegment });
+          segments.push({ bearing: fastBearing(prevSegment.start, prevSegment.end), segment: prevSegment });
         } else if (geom.type === 'LineString' && coords.length > 2 &&
-                   turf.distance(turf.point(coords[0]), turf.point(coords[coords.length - 1]), { units: 'meters' }) < 1) {
-          // Closed polygon - wrap around
+                   fastDistance(coords[0], coords[coords.length - 1]) < 1) {
           const prevSegment = { start: coords[coords.length - 2], end: coords[i] };
-          const prevBearing = turf.bearing(turf.point(prevSegment.start), turf.point(prevSegment.end));
-          segments.push({ bearing: prevBearing, segment: prevSegment });
+          segments.push({ bearing: fastBearing(prevSegment.start, prevSegment.end), segment: prevSegment });
         }
 
-        // Next segment (from this vertex to next vertex)
         if (i < coords.length - 1) {
           const nextSegment = { start: coords[i], end: coords[i + 1] };
-          const nextBearing = turf.bearing(turf.point(nextSegment.start), turf.point(nextSegment.end));
-          segments.push({ bearing: nextBearing, segment: nextSegment });
+          segments.push({ bearing: fastBearing(nextSegment.start, nextSegment.end), segment: nextSegment });
         } else if (geom.type === 'LineString' && coords.length > 2 &&
-                   turf.distance(turf.point(coords[0]), turf.point(coords[coords.length - 1]), { units: 'meters' }) < 1) {
-          // Closed polygon - wrap around
+                   fastDistance(coords[0], coords[coords.length - 1]) < 1) {
           const nextSegment = { start: coords[i], end: coords[1] };
-          const nextBearing = turf.bearing(turf.point(nextSegment.start), turf.point(nextSegment.end));
-          segments.push({ bearing: nextBearing, segment: nextSegment });
+          segments.push({ bearing: fastBearing(nextSegment.start, nextSegment.end), segment: nextSegment });
         }
 
         break; // Found the vertex, no need to continue
@@ -230,10 +218,7 @@ export function getSnappedLineBearing(ctx, snappedCoord) {
     return null;
   }
 
-  const bearing = turf.bearing(
-    turf.point(result.segment.start),
-    turf.point(result.segment.end)
-  );
+  const bearing = fastBearing(result.segment.start, result.segment.end);
   return { bearing, segment: result.segment };
 }
 
@@ -302,29 +287,23 @@ export function calculateCircleLineIntersection(centerPoint, radiusMeters, lineS
  * Returns null if lines are parallel or intersection distance is unreasonable
  */
 export function calculateLineIntersection(startPoint, bearing, lineSegment) {
-  const p1 = turf.point(startPoint);
-  const lineStart = turf.point(lineSegment.start);
-  const lineEnd = turf.point(lineSegment.end);
-  const lineBearing = turf.bearing(lineStart, lineEnd);
+  const lineBearing = fastBearing(lineSegment.start, lineSegment.end);
 
   // Check if lines are nearly parallel (within 5 degrees)
   let angleDiff = Math.abs(bearing - lineBearing);
   if (angleDiff > 180) angleDiff = Math.abs(360 - angleDiff);
   if (angleDiff < 5 || angleDiff > 175) {
-    return null; // Lines are too parallel
+    return null;
   }
 
-  // Create a long line along the bearing (extended bidirectionally)
-  // Using 100m (0.1km) extension which is sufficient for small geometries
   const bearingLine = turf.lineString([
-    turf.destination(p1, 0.1, bearing + 180, { units: 'kilometers' }).geometry.coordinates,
-    turf.destination(p1, 0.1, bearing, { units: 'kilometers' }).geometry.coordinates
+    fastDestination(startPoint, 100, bearing + 180),
+    fastDestination(startPoint, 100, bearing)
   ]);
 
-  // Create extended line along the snap line bearing
   const extendedSnapLine = turf.lineString([
-    turf.destination(lineStart, 0.1, lineBearing + 180, { units: 'kilometers' }).geometry.coordinates,
-    turf.destination(lineStart, 0.1, lineBearing, { units: 'kilometers' }).geometry.coordinates
+    fastDestination(lineSegment.start, 100, lineBearing + 180),
+    fastDestination(lineSegment.start, 100, lineBearing)
   ]);
 
   try {
@@ -332,7 +311,7 @@ export function calculateLineIntersection(startPoint, bearing, lineSegment) {
 
     if (intersection.features.length > 0) {
       const intersectionPoint = intersection.features[0].geometry.coordinates;
-      const distance = turf.distance(p1, turf.point(intersectionPoint), { units: 'meters' });
+      const distance = fastDistance(startPoint, intersectionPoint);
 
       // Only return if distance is reasonable (less than 10km)
       if (distance < 10000) {
@@ -364,22 +343,18 @@ export function findExtendedGuidelineIntersection(extendedGuidelines, snapInfo, 
     return null;
   }
 
-  const cursorPoint = turf.point([cursorPosition.lng, cursorPosition.lat]);
+  const cursorCoord = [cursorPosition.lng, cursorPosition.lat];
   const lineSegment = snapInfo.segment;
-  const lineStart = turf.point(lineSegment.start);
-  const lineEnd = turf.point(lineSegment.end);
-  const lineBearing = turf.bearing(lineStart, lineEnd);
+  const lineBearing = fastBearing(lineSegment.start, lineSegment.end);
 
-  // Create extended line from the snap line
   const extendedSnapLine = turf.lineString([
-    turf.destination(lineStart, 0.1, lineBearing + 180, { units: 'kilometers' }).geometry.coordinates,
-    turf.destination(lineStart, 0.1, lineBearing, { units: 'kilometers' }).geometry.coordinates
+    fastDestination(lineSegment.start, 100, lineBearing + 180),
+    fastDestination(lineSegment.start, 100, lineBearing)
   ]);
 
   let closestIntersection = null;
   let minDistance = Infinity;
 
-  // Check each extended guideline for intersections
   for (const guideline of extendedGuidelines) {
     try {
       const guidelineLineString = turf.lineString(guideline.geometry.coordinates);
@@ -387,10 +362,7 @@ export function findExtendedGuidelineIntersection(extendedGuidelines, snapInfo, 
 
       for (const intersection of intersections.features) {
         const intersectionCoord = intersection.geometry.coordinates;
-        const intersectionPoint = turf.point(intersectionCoord);
-
-        // Check distance from cursor to intersection
-        const distanceToCursor = turf.distance(cursorPoint, intersectionPoint, { units: 'meters' });
+        const distanceToCursor = fastDistance(cursorCoord, intersectionCoord);
 
         if (distanceToCursor < minDistance) {
           minDistance = distanceToCursor;
@@ -575,18 +547,12 @@ export function findCollinearIntersections(map, snapping, vertexCoord, collinear
     return null;
   }
 
-  const cursorPoint = turf.point([cursorPosition.lng, cursorPosition.lat]);
-  const vertexPoint = turf.point(vertexCoord);
-
-  // Create an extended line along the collinear direction (500m in each direction for better coverage)
-  const extensionDistance = 0.5; // 500m in km
-  const extendedStart = turf.destination(vertexPoint, extensionDistance, collinearBearing + 180, UNITS_KM);
-  const extendedEnd = turf.destination(vertexPoint, extensionDistance, collinearBearing, UNITS_KM);
+  const cursorCoord = [cursorPosition.lng, cursorPosition.lat];
 
   const collinearLine = turf.lineString([
-    extendedStart.geometry.coordinates,
+    fastDestination(vertexCoord, 500, collinearBearing + 180),
     vertexCoord,
-    extendedEnd.geometry.coordinates
+    fastDestination(vertexCoord, 500, collinearBearing)
   ]);
 
   // Get bounds of collinear line and expand
@@ -678,10 +644,7 @@ export function findCollinearIntersections(map, snapping, vertexCoord, collinear
 
         for (const intersection of intersections.features) {
           const intersectionCoord = intersection.geometry.coordinates;
-          const intersectionPoint = turf.point(intersectionCoord);
-
-          // Check distance from cursor to intersection
-          const distanceToCursor = turf.distance(cursorPoint, intersectionPoint, UNITS_METERS);
+          const distanceToCursor = fastDistance(cursorCoord, intersectionCoord);
 
           if (distanceToCursor < minDistance) {
             minDistance = distanceToCursor;
@@ -807,7 +770,7 @@ export function findNearbyParallelLines(ctx, map, lastVertex, currentPosition) {
 
             if (segDist < minSegDist) {
               minSegDist = segDist;
-              segmentBearing = turf.bearing(turf.point(segStart), turf.point(segEnd));
+              segmentBearing = fastBearing(segStart, segEnd);
               bestSegment = { start: segStart, end: segEnd };
             }
           }
@@ -849,7 +812,7 @@ export function findNearbyParallelLines(ctx, map, lastVertex, currentPosition) {
 
               if (segDist < minSegDist) {
                 minSegDist = segDist;
-                segmentBearing = turf.bearing(turf.point(segStart), turf.point(segEnd));
+                segmentBearing = fastBearing(segStart, segEnd);
                 bestSegment = { start: segStart, end: segEnd };
               }
             }
@@ -940,11 +903,8 @@ export function snapToNearbyVertex(calculatedCoord, existingVertices, snapThresh
     return null;
   }
 
-  const calculatedPoint = turf.point(calculatedCoord);
-
   for (const vertex of existingVertices) {
-    const vertexPoint = turf.point(vertex);
-    const distance = turf.distance(calculatedPoint, vertexPoint, { units: 'meters' });
+    const distance = fastDistance(calculatedCoord, vertex);
 
     if (distance <= snapThreshold) {
       return vertex;
@@ -977,18 +937,8 @@ export function resolveSnapConflicts(options) {
   if (bothSnapsActive && parallelLineMatch) {
     // Calculate the bothSnapsActive intersection point
     const perpLine = {
-      start: turf.destination(
-        turf.point(closingPerpendicularSnap.firstVertex),
-        0.1,
-        closingPerpendicularSnap.perpendicularBearing + 180,
-        { units: "kilometers" }
-      ).geometry.coordinates,
-      end: turf.destination(
-        turf.point(closingPerpendicularSnap.firstVertex),
-        0.1,
-        closingPerpendicularSnap.perpendicularBearing,
-        { units: "kilometers" }
-      ).geometry.coordinates,
+      start: fastDestination(closingPerpendicularSnap.firstVertex, 100, closingPerpendicularSnap.perpendicularBearing + 180),
+      end: fastDestination(closingPerpendicularSnap.firstVertex, 100, closingPerpendicularSnap.perpendicularBearing),
     };
 
     const intersection = calculateLineIntersection(
@@ -998,12 +948,7 @@ export function resolveSnapConflicts(options) {
     );
 
     if (intersection) {
-      // Calculate distance from mouse to intersection point
-      const distanceToIntersection = turf.distance(
-        turf.point([lngLat.lng, lngLat.lat]),
-        turf.point(intersection.coord),
-        { units: 'meters' }
-      );
+      const distanceToIntersection = fastDistance([lngLat.lng, lngLat.lat], intersection.coord);
 
       // If very close to intersection (within configured threshold), prioritize bothSnapsActive
       if (distanceToIntersection < proximityThreshold) {
@@ -1062,49 +1007,32 @@ export function resolveSnapConflicts(options) {
  * @returns {Object|null} {coord: [lng, lat], distanceFromCursor: meters} or null if no intersection
  */
 export function calculatePerpendicularToLine(fromVertex, lineSegment, cursorPosition) {
-  const vertexPoint = turf.point(fromVertex);
-  const lineStart = turf.point(lineSegment.start);
-  const lineEnd = turf.point(lineSegment.end);
+  const lineBearing = fastBearing(lineSegment.start, lineSegment.end);
 
-  // Calculate the bearing of the line
-  const lineBearing = turf.bearing(lineStart, lineEnd);
-
-  // Calculate perpendicular bearings (both directions)
   const perpBearing1 = lineBearing + 90;
   const perpBearing2 = lineBearing - 90;
 
-  // Create extended line segment (extend in both directions)
-  const extendedLineStart = turf.destination(lineStart, 0.1, lineBearing + 180, { units: 'kilometers' });
-  const extendedLineEnd = turf.destination(lineEnd, 0.1, lineBearing, { units: 'kilometers' });
   const extendedLine = turf.lineString([
-    extendedLineStart.geometry.coordinates,
-    extendedLineEnd.geometry.coordinates
+    fastDestination(lineSegment.start, 100, lineBearing + 180),
+    fastDestination(lineSegment.end, 100, lineBearing)
   ]);
 
-  // Try both perpendicular directions
   let bestIntersection = null;
   let minDistance = Infinity;
+  const cursorCoord = [cursorPosition.lng, cursorPosition.lat];
 
   for (const perpBearing of [perpBearing1, perpBearing2]) {
-    // Create perpendicular line from vertex (extended in both directions)
-    const perpStart = turf.destination(vertexPoint, 0.1, perpBearing + 180, { units: 'kilometers' });
-    const perpEnd = turf.destination(vertexPoint, 0.1, perpBearing, { units: 'kilometers' });
     const perpLine = turf.lineString([
-      perpStart.geometry.coordinates,
-      perpEnd.geometry.coordinates
+      fastDestination(fromVertex, 100, perpBearing + 180),
+      fastDestination(fromVertex, 100, perpBearing)
     ]);
 
     try {
-      // Find intersection
       const intersections = turf.lineIntersect(perpLine, extendedLine);
 
       if (intersections.features.length > 0) {
         const intersectionCoord = intersections.features[0].geometry.coordinates;
-        const intersectionPoint = turf.point(intersectionCoord);
-
-        // Calculate distance from intersection to cursor
-        const cursorPoint = turf.point([cursorPosition.lng, cursorPosition.lat]);
-        const distanceFromCursor = turf.distance(intersectionPoint, cursorPoint, { units: 'meters' });
+        const distanceFromCursor = fastDistance(intersectionCoord, cursorCoord);
 
         if (distanceFromCursor < minDistance) {
           minDistance = distanceFromCursor;
@@ -1139,10 +1067,7 @@ export function getExtendedGuidelineBearings(extendedGuidelines) {
       const coords = guideline.geometry.coordinates;
       if (coords.length >= 2) {
         // Calculate bearing from first to last coordinate
-        const bearing = turf.bearing(
-          turf.point(coords[0]),
-          turf.point(coords[coords.length - 1])
-        );
+        const bearing = fastBearing(coords[0], coords[coords.length - 1]);
         bearings.push({
           bearing: bearing,
           guideline: guideline,

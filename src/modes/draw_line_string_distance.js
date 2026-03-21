@@ -22,6 +22,7 @@ import {
   clearPointCache,
   calculatePixelDistanceToExtendedGuidelines,
 } from "../lib/distance_mode_helpers.js";
+import { fastBearing, fastDistance, fastDestination, metersPerPixel as computeMetersPerPixel } from "../lib/fast_math.js";
 import {
   createDistanceInput as createDistanceInputUI,
   createAngleInput as createAngleInputUI,
@@ -1261,7 +1262,7 @@ DrawLineStringDistance.clickOnMap = function (state, e) {
   let referenceBearing = 0; // Default to true north
   if (state.vertices.length >= 2) {
     const secondLastVertex = state.vertices[state.vertices.length - 2];
-    referenceBearing = turf.bearing(turf.point(secondLastVertex), from);
+    referenceBearing = fastBearing(secondLastVertex, lastVertex);
   } else if (state.snappedLineBearing !== null) {
     referenceBearing = state.snappedLineBearing;
   }
@@ -1287,7 +1288,7 @@ DrawLineStringDistance.clickOnMap = function (state, e) {
     bearingToUse = referenceBearing + state.currentAngle;
   } else if (snapInfo && snapInfo.type === "point") {
     // Priority 1: Point snap direction
-    bearingToUse = turf.bearing(from, turf.point(snapInfo.coord));
+    bearingToUse = fastBearing(lastVertex, snapInfo.coord);
     usePointDirection = true;
   } else if (snapInfo && snapInfo.type === "line") {
     // Priority 2: Line snap bearing - takes priority over bearing-based snaps
@@ -1515,6 +1516,10 @@ DrawLineStringDistance.onMouseMove = function (state, e) {
     lastHeavyComputeTime = now;
   }
 
+  // Cache per-frame computations
+  const _mpp = computeMetersPerPixel(lngLat.lat, this.map.getZoom());
+  const _snapTolM = (this._ctx.options.snapDistance || 20) * _mpp;
+
   // Check if shift is held to temporarily disable snapping
   const shiftHeld = CommonSelectors.isShiftDown(e);
   if (shiftHeld && state.vertices.length >= 1) {
@@ -1678,8 +1683,7 @@ DrawLineStringDistance.onMouseMove = function (state, e) {
           turf.point([lngLat.lng, lngLat.lat]),
           TURF_UNITS_M
         );
-        const metersPerPixel = 156543.03392 * Math.cos(lngLat.lat * Math.PI / 180) / Math.pow(2, this.map.getZoom());
-        const snapToleranceMeters = (this._ctx.options.snapDistance || 20) * metersPerPixel;
+        const snapToleranceMeters = _snapTolM;
 
         if (distToIntersection <= snapToleranceMeters) {
           snapInfo = {
@@ -1692,8 +1696,7 @@ DrawLineStringDistance.onMouseMove = function (state, e) {
 
       // Check for intersections between extended guidelines and ANY snap lines (proactive search)
       if (!snapInfo) {
-        const metersPerPixel = 156543.03392 * Math.cos(lngLat.lat * Math.PI / 180) / Math.pow(2, this.map.getZoom());
-        const snapToleranceMeters = (this._ctx.options.snapDistance || 20) * metersPerPixel;
+        const snapToleranceMeters = _snapTolM;
         const guidelineIntersection = findAllGuidelineIntersections(
           this.map,
           this._ctx.snapping,
@@ -1863,7 +1866,6 @@ DrawLineStringDistance.onMouseMove = function (state, e) {
   // Calculate preview position using new priority system
   let previewVertex;
   const lastVertex = state.vertices[state.vertices.length - 1];
-  const from = turf.point(lastVertex);
   const hasUserDistance =
     state.currentDistance !== null && state.currentDistance > 0;
 
@@ -1881,8 +1883,7 @@ DrawLineStringDistance.onMouseMove = function (state, e) {
         turf.point([lngLat.lng, lngLat.lat]),
         TURF_UNITS_M
       );
-      const metersPerPixel = 156543.03392 * Math.cos(lngLat.lat * Math.PI / 180) / Math.pow(2, this.map.getZoom());
-      const snapToleranceMeters = (this._ctx.options.snapDistance || 20) * metersPerPixel;
+      const snapToleranceMeters = _snapTolM;
 
       if (distToIntersection <= snapToleranceMeters) {
         snapInfo = {
@@ -1895,8 +1896,7 @@ DrawLineStringDistance.onMouseMove = function (state, e) {
 
     // Check for intersections between extended guidelines and ANY snap lines (proactive search)
     if (!snapInfo) {
-      const metersPerPixel = 156543.03392 * Math.cos(lngLat.lat * Math.PI / 180) / Math.pow(2, this.map.getZoom());
-      const snapToleranceMeters = (this._ctx.options.snapDistance || 20) * metersPerPixel;
+      const snapToleranceMeters = _snapTolM;
       const guidelineIntersection = findAllGuidelineIntersections(
         this.map,
         this._ctx.snapping,
@@ -2016,7 +2016,7 @@ DrawLineStringDistance.onMouseMove = function (state, e) {
   }
 
   // Calculate mouse bearing for orthogonal snap check
-  const mouseBearing = turf.bearing(from, turf.point([lngLat.lng, lngLat.lat]));
+  const mouseBearing = fastBearing(lastVertex, [lngLat.lng, lngLat.lat]);
 
   // Check for closing perpendicular snap: helps draw rectangles by making the closing
   // segment (from current position to first vertex) perpendicular to the first segment
@@ -2024,14 +2024,8 @@ DrawLineStringDistance.onMouseMove = function (state, e) {
   if (state.vertices.length >= 3) {
     const firstVertex = state.vertices[0];
     const secondVertex = state.vertices[1];
-    const firstSegmentBearing = turf.bearing(
-      turf.point(firstVertex),
-      turf.point(secondVertex)
-    );
-    const bearingToFirst = turf.bearing(
-      turf.point([lngLat.lng, lngLat.lat]),
-      turf.point(firstVertex)
-    );
+    const firstSegmentBearing = fastBearing(firstVertex, secondVertex);
+    const bearingToFirst = fastBearing([lngLat.lng, lngLat.lat], firstVertex);
 
     // Check if bearing to first vertex is perpendicular to first segment (90° or 270°)
     for (const angle of [90, 270]) {
@@ -2120,9 +2114,7 @@ DrawLineStringDistance.onMouseMove = function (state, e) {
 
   // Check if perpendicular-to-line snap should override regular line snap
   // This happens when cursor is close to the perpendicular point (within snap tolerance)
-  const snapTolerance = this._ctx.options.snapDistance || 20; // pixels
-  const metersPerPixel = 156543.03392 * Math.cos(lngLat.lat * Math.PI / 180) / Math.pow(2, this.map.getZoom());
-  const snapToleranceMeters = snapTolerance * metersPerPixel;
+  const snapToleranceMeters = _snapTolM;
 
   let isPerpendicularToLineSnap = false;
   if (perpendicularToLineSnap && perpendicularToLineSnap.distanceFromCursor <= snapToleranceMeters) {
@@ -2132,25 +2124,16 @@ DrawLineStringDistance.onMouseMove = function (state, e) {
 
     if (orthogonalMatch !== null) {
       // Calculate distance to orthogonal snap point
-      const orthogonalPoint = turf.destination(from, 0.1, orthogonalMatch.bearing, { units: 'kilometers' });
-      const orthogonalDist = turf.distance(
-        turf.point([lngLat.lng, lngLat.lat]),
-        orthogonalPoint,
-        { units: 'meters' }
-      );
+      const orthogonalCoord = fastDestination(lastVertex, 100, orthogonalMatch.bearing);
+      const orthogonalDist = fastDistance([lngLat.lng, lngLat.lat], orthogonalCoord);
       if (orthogonalDist < perpendicularToLineSnap.distanceFromCursor) {
         shouldUsePerpendicular = false;
       }
     }
 
     if (shouldUsePerpendicular && parallelLineMatch !== null) {
-      // Calculate distance to parallel snap point
-      const parallelPoint = turf.destination(from, 0.1, parallelLineMatch.bearing, { units: 'kilometers' });
-      const parallelDist = turf.distance(
-        turf.point([lngLat.lng, lngLat.lat]),
-        parallelPoint,
-        { units: 'meters' }
-      );
+      const parallelCoord = fastDestination(lastVertex, 100, parallelLineMatch.bearing);
+      const parallelDist = fastDistance([lngLat.lng, lngLat.lat], parallelCoord);
       if (parallelDist < perpendicularToLineSnap.distanceFromCursor) {
         shouldUsePerpendicular = false;
       }
@@ -2177,7 +2160,7 @@ DrawLineStringDistance.onMouseMove = function (state, e) {
   let referenceBearing = 0; // Default to true north
   if (state.vertices.length >= 2) {
     const secondLastVertex = state.vertices[state.vertices.length - 2];
-    referenceBearing = turf.bearing(turf.point(secondLastVertex), from);
+    referenceBearing = fastBearing(secondLastVertex, lastVertex);
   } else if (state.snappedLineBearing !== null) {
     referenceBearing = state.snappedLineBearing;
   }
@@ -2203,7 +2186,7 @@ DrawLineStringDistance.onMouseMove = function (state, e) {
     bearingToUse = referenceBearing + state.currentAngle;
   } else if (snapInfo && snapInfo.type === "point") {
     // Priority 1: Point snap direction
-    bearingToUse = turf.bearing(from, turf.point(snapInfo.coord));
+    bearingToUse = fastBearing(lastVertex, snapInfo.coord);
     usePointDirection = true;
   } else if (snapInfo && snapInfo.type === "line") {
     // Priority 2: Line snap bearing - takes priority over bearing-based snaps
@@ -2248,42 +2231,16 @@ DrawLineStringDistance.onMouseMove = function (state, e) {
       if (circleLineIntersection) {
         previewVertex = circleLineIntersection.coord;
       } else {
-        // Fallback: if no intersection found, use bearing to create point at exact distance
-        const destinationPoint = turf.destination(
-          from,
-          state.currentDistance / 1000,
-          bearingToUse,
-          { units: "kilometers" }
-        );
-        previewVertex = destinationPoint.geometry.coordinates;
+        previewVertex = fastDestination(lastVertex, state.currentDistance, bearingToUse);
       }
     } else {
-      // No line snap: use bearing to create point at exact distance
-      const destinationPoint = turf.destination(
-        from,
-        state.currentDistance / 1000,
-        bearingToUse,
-        { units: "kilometers" }
-      );
-      previewVertex = destinationPoint.geometry.coordinates;
+      previewVertex = fastDestination(lastVertex, state.currentDistance, bearingToUse);
     }
     this.updateGuideCircle(state, lastVertex, state.currentDistance);
   } else if (bothSnapsActive) {
-    // Special case: Both orthogonal and closing perpendicular are active
-    // Find intersection where both constraints are satisfied
     const perpLine = {
-      start: turf.destination(
-        turf.point(closingPerpendicularSnap.firstVertex),
-        0.1,
-        closingPerpendicularSnap.perpendicularBearing + 180,
-        { units: "kilometers" }
-      ).geometry.coordinates,
-      end: turf.destination(
-        turf.point(closingPerpendicularSnap.firstVertex),
-        0.1,
-        closingPerpendicularSnap.perpendicularBearing,
-        { units: "kilometers" }
-      ).geometry.coordinates,
+      start: fastDestination(closingPerpendicularSnap.firstVertex, 100, closingPerpendicularSnap.perpendicularBearing + 180),
+      end: fastDestination(closingPerpendicularSnap.firstVertex, 100, closingPerpendicularSnap.perpendicularBearing),
     };
 
     const intersection = calculateLineIntersection(
@@ -2293,7 +2250,6 @@ DrawLineStringDistance.onMouseMove = function (state, e) {
     );
     if (intersection) {
       previewVertex = intersection.coord;
-      // Show both indicators (regular at last vertex, closing at first vertex)
       this.updateRightAngleIndicator(
         state,
         lastVertex,
@@ -2301,10 +2257,7 @@ DrawLineStringDistance.onMouseMove = function (state, e) {
         orthogonalMatch.bearing,
         orthogonalMatch.referenceSegment
       );
-      const closingBearing = turf.bearing(
-        turf.point(previewVertex),
-        turf.point(closingPerpendicularSnap.firstVertex)
-      );
+      const closingBearing = fastBearing(previewVertex, closingPerpendicularSnap.firstVertex);
       const firstSegment = { start: state.vertices[0], end: state.vertices[1] };
       this.updateClosingRightAngleIndicator(
         state,
@@ -2314,19 +2267,8 @@ DrawLineStringDistance.onMouseMove = function (state, e) {
         firstSegment
       );
     } else {
-      // Fallback to mouse distance
-      const mouseDistance = turf.distance(
-        from,
-        turf.point([lngLat.lng, lngLat.lat]),
-        { units: "kilometers" }
-      );
-      const destinationPoint = turf.destination(
-        from,
-        mouseDistance,
-        orthogonalMatch.bearing,
-        { units: "kilometers" }
-      );
-      previewVertex = destinationPoint.geometry.coordinates;
+      const mouseDistance = fastDistance(lastVertex, [lngLat.lng, lngLat.lat]);
+      previewVertex = fastDestination(lastVertex, mouseDistance, orthogonalMatch.bearing);
     }
     this.removeGuideCircle(state);
   } else if (
@@ -2338,18 +2280,8 @@ DrawLineStringDistance.onMouseMove = function (state, e) {
     // Closing perpendicular snap: find intersection where closing segment is perpendicular to first segment
     // Only activates when no concrete snap target nearby
     const perpLine = {
-      start: turf.destination(
-        turf.point(closingPerpendicularSnap.firstVertex),
-        0.1,
-        closingPerpendicularSnap.perpendicularBearing + 180,
-        { units: "kilometers" }
-      ).geometry.coordinates,
-      end: turf.destination(
-        turf.point(closingPerpendicularSnap.firstVertex),
-        0.1,
-        closingPerpendicularSnap.perpendicularBearing,
-        { units: "kilometers" }
-      ).geometry.coordinates,
+      start: fastDestination(closingPerpendicularSnap.firstVertex, 100, closingPerpendicularSnap.perpendicularBearing + 180),
+      end: fastDestination(closingPerpendicularSnap.firstVertex, 100, closingPerpendicularSnap.perpendicularBearing),
     };
 
     const intersection = calculateLineIntersection(
@@ -2360,11 +2292,7 @@ DrawLineStringDistance.onMouseMove = function (state, e) {
     if (intersection) {
       previewVertex = intersection.coord;
       isClosingPerpendicularSnap = true;
-      // Show right-angle indicator at first vertex
-      const closingBearing = turf.bearing(
-        turf.point(previewVertex),
-        turf.point(closingPerpendicularSnap.firstVertex)
-      );
+      const closingBearing = fastBearing(previewVertex, closingPerpendicularSnap.firstVertex);
       const firstSegment = { start: state.vertices[0], end: state.vertices[1] };
       this.updateClosingRightAngleIndicator(
         state,
@@ -2375,57 +2303,23 @@ DrawLineStringDistance.onMouseMove = function (state, e) {
       );
     } else {
       // Fallback to mouse distance
-      const mouseDistance = turf.distance(
-        from,
-        turf.point([lngLat.lng, lngLat.lat]),
-        { units: "kilometers" }
-      );
-      const destinationPoint = turf.destination(
-        from,
-        mouseDistance,
-        bearingToUse,
-        { units: "kilometers" }
-      );
-      previewVertex = destinationPoint.geometry.coordinates;
+      const mouseDistance = fastDistance(lastVertex, [lngLat.lng, lngLat.lat]);
+      previewVertex = fastDestination(lastVertex, mouseDistance, bearingToUse);
     }
     this.removeGuideCircle(state);
   } else if (usePointDirection && snapInfo) {
-    // Point snap: use distance to point
     previewVertex = snapInfo.coord;
     this.removeGuideCircle(state);
   } else if (snapInfo && snapInfo.type === "line") {
-    // Line snap: use snapped position
     previewVertex = snapInfo.coord;
     this.removeGuideCircle(state);
   } else if (isOrthogonalSnap || isParallelLineSnap) {
-    // Bearing snap (orthogonal/parallel) without any snap target: use mouse distance with bearing
-    const mouseDistance = turf.distance(
-      from,
-      turf.point([lngLat.lng, lngLat.lat]),
-      { units: "kilometers" }
-    );
-    const destinationPoint = turf.destination(
-      from,
-      mouseDistance,
-      bearingToUse,
-      { units: "kilometers" }
-    );
-    previewVertex = destinationPoint.geometry.coordinates;
+    const mouseDistance = fastDistance(lastVertex, [lngLat.lng, lngLat.lat]);
+    previewVertex = fastDestination(lastVertex, mouseDistance, bearingToUse);
     this.removeGuideCircle(state);
   } else {
-    // No snap: use mouse distance with bearing
-    const mouseDistance = turf.distance(
-      from,
-      turf.point([lngLat.lng, lngLat.lat]),
-      { units: "kilometers" }
-    );
-    const destinationPoint = turf.destination(
-      from,
-      mouseDistance,
-      bearingToUse,
-      { units: "kilometers" }
-    );
-    previewVertex = destinationPoint.geometry.coordinates;
+    const mouseDistance = fastDistance(lastVertex, [lngLat.lng, lngLat.lat]);
+    previewVertex = fastDestination(lastVertex, mouseDistance, bearingToUse);
     this.removeGuideCircle(state);
   }
 
@@ -2434,25 +2328,16 @@ DrawLineStringDistance.onMouseMove = function (state, e) {
   if (isPerpendicularToLineSnap && state.perpendicularToLineSnap) {
     // Show right angle indicator at the perpendicular point
     const perpSnap = state.perpendicularToLineSnap;
-    const snapPoint = turf.point(perpSnap.coord);
 
-    // Calculate bearing from last vertex to perpendicular point
-    const bearingToPerp = turf.bearing(turf.point(lastVertex), snapPoint);
+    const bearingToPerp = fastBearing(lastVertex, perpSnap.coord);
 
-    // The indicator should always be on the side of the snapping line where the last vertex is
-    // Use cross product to determine which side: (snapPoint - lineStart) × (lastVertex - lineStart)
-    const lineStart = turf.point(perpSnap.lineSegment.start);
-    const lineEnd = turf.point(perpSnap.lineSegment.end);
-    const lastVertPoint = turf.point(lastVertex);
-
-    // Vectors from line start
     const toSnap = [
-      perpSnap.coord[0] - lineStart.geometry.coordinates[0],
-      perpSnap.coord[1] - lineStart.geometry.coordinates[1]
+      perpSnap.coord[0] - perpSnap.lineSegment.start[0],
+      perpSnap.coord[1] - perpSnap.lineSegment.start[1]
     ];
     const toLastVert = [
-      lastVertPoint.geometry.coordinates[0] - lineStart.geometry.coordinates[0],
-      lastVertPoint.geometry.coordinates[1] - lineStart.geometry.coordinates[1]
+      lastVertex[0] - perpSnap.lineSegment.start[0],
+      lastVertex[1] - perpSnap.lineSegment.start[1]
     ];
 
     // Cross product: toSnap × toLastVert
@@ -2522,9 +2407,7 @@ DrawLineStringDistance.onMouseMove = function (state, e) {
   }
 
   // Calculate actual distance to preview vertex (accounts for all snapping)
-  const actualDistance = turf.distance(from, turf.point(previewVertex), {
-    units: "meters",
-  });
+  const actualDistance = fastDistance(lastVertex, previewVertex);
 
   // Update distance label
   this.updateDistanceLabel(state, lastVertex, previewVertex, actualDistance);
