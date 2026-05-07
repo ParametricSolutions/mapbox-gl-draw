@@ -63,7 +63,7 @@ DirectSelectRotate.toDisplayFeatures = function (state, geojson, push) {
       suppPoints.forEach(push);
     }
 
-    if (state.feature.properties.isEditGeometry) {
+    if (state.feature.properties.isEditGeometry && !hideVertices) {
       const rotPoints = this.createBuildingRotationPoint(state, geojson);
       rotPoints.forEach(push);
     }
