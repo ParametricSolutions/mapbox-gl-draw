@@ -89,7 +89,16 @@ DrawLineStringDistance.onSetup = function (opts) {
     isActivelySnappingToGuideline: false, // true when actually snapping to the guideline
     // Parallel line snapping state
     parallelLineSnap: null,
+    lastClickTime: 0,
   };
+
+  state.handleContextMenu = (e) => {
+    e.preventDefault();
+    if (state.vertices.length >= 2) {
+      this.finishDrawing(state);
+    }
+  };
+  this.map.getContainer().addEventListener('contextmenu', state.handleContextMenu);
 
   this.createDistanceInput(state);
   this.createAngleInput(state);
@@ -820,6 +829,15 @@ DrawLineStringDistance.removeAngleReferenceLine = function () {
 };
 
 DrawLineStringDistance.clickOnMap = function (state, e) {
+  const now = Date.now();
+  const timeSinceLastClick = now - state.lastClickTime;
+  state.lastClickTime = now;
+
+  if (timeSinceLastClick < 300 && state.vertices.length >= 2) {
+    this.finishDrawing(state);
+    return;
+  }
+
   // Check if shift is held to bypass snapping
   const shiftHeld = CommonSelectors.isShiftDown(e);
 
@@ -3795,6 +3813,9 @@ DrawLineStringDistance.finishDrawing = function (state) {
 };
 
 DrawLineStringDistance.onStop = function (state) {
+  if (state.handleContextMenu) {
+    this.map.getContainer().removeEventListener('contextmenu', state.handleContextMenu);
+  }
   doubleClickZoom.enable(this);
   this.activateUIButton();
   this.removeGuideCircle(state);

@@ -105,7 +105,21 @@ DrawPolygonDistance.onSetup = function (opts) {
     linePhase: 'drawing', // 'drawing' or 'offset'
     lineOffsetWidth: null,
     lineOffsetSide: null, // 'left' or 'right' based on mouse position
+    lastClickTime: 0,
   };
+
+  state.handleContextMenu = (e) => {
+    e.preventDefault();
+    if (state.drawingSubMode === DRAWING_SUB_MODES.LINE) {
+      if (state.linePhase === 'offset') return;
+      if (state.vertices.length >= 2) {
+        this.enterLineOffsetPhase(state);
+      }
+    } else if (state.vertices.length >= 3) {
+      this.finishDrawing(state);
+    }
+  };
+  this.map.getContainer().addEventListener('contextmenu', state.handleContextMenu);
 
   this.createDistanceInput(state);
   this.createAngleInput(state);
@@ -1316,6 +1330,22 @@ DrawPolygonDistance.removeAngleReferenceLine = function () {
 };
 
 DrawPolygonDistance.clickOnMap = function (state, e) {
+  const now = Date.now();
+  const timeSinceLastClick = now - state.lastClickTime;
+  state.lastClickTime = now;
+
+  if (timeSinceLastClick < 300) {
+    if (state.drawingSubMode === DRAWING_SUB_MODES.LINE) {
+      if (state.linePhase === 'offset') return;
+      if (state.vertices.length >= 2) {
+        this.enterLineOffsetPhase(state);
+      }
+    } else if (state.vertices.length >= 3) {
+      this.finishDrawing(state);
+    }
+    return;
+  }
+
   // Check if shift is held to bypass snapping
   const shiftHeld = CommonSelectors.isShiftDown(e);
 
@@ -4411,6 +4441,9 @@ DrawPolygonDistance.finishDrawing = function (state) {
 };
 
 DrawPolygonDistance.onStop = function (state) {
+  if (state.handleContextMenu) {
+    this.map.getContainer().removeEventListener('contextmenu', state.handleContextMenu);
+  }
   doubleClickZoom.enable(this);
   this.activateUIButton();
   this.removeGuideCircle(state);
