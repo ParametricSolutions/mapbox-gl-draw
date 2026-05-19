@@ -442,14 +442,9 @@ export function hideDistanceAngleUI(state) {
 }
 
 /**
- * Create the snapping indicator UI (appends to distance container)
- * Shows whether snapping is enabled or disabled based on Shift key state
- * Supports locking the disabled state by clicking while Shift is held
- * Lock state persists between drawings via ctx.snappingLocked
- * @param {Object} ctx - The draw context
- * @param {Object} state - The mode state
- * @param {Object} options - Configuration options
- * @param {boolean} [options.forceCreate=false] - Skip useAngleDistanceInput check
+ * Two-mode snapping indicator:
+ *   Toggle mode (default): Shift press toggles snapping on/off, click locks off (enters hold mode)
+ *   Hold mode: snapping locked off, hold Shift to temporarily enable, click unlocks (returns to toggle mode)
  */
 export function createSnappingIndicator(ctx, state, options = {}) {
   const { forceCreate = false } = options;
@@ -463,11 +458,9 @@ export function createSnappingIndicator(ctx, state, options = {}) {
     return null;
   }
 
-  // Create separator
   const separator = document.createElement('span');
   separator.className = 'mapbox-gl-draw-input-separator';
 
-  // Create label with key badge
   const label = document.createElement('span');
   label.className = 'mapbox-gl-draw-snapping-label';
   const keySpan = document.createElement('span');
@@ -486,54 +479,80 @@ export function createSnappingIndicator(ctx, state, options = {}) {
   const ICON_LOCKED = '\u{1F512}\u{FE0E}';
   const ICON_UNLOCKED = '\u{1F513}\u{FE0E}';
 
+  if (ctx.snappingHoldMode === undefined) ctx.snappingHoldMode = false;
+  if (ctx.snappingLocked === undefined) ctx.snappingLocked = false;
+
+  const setSnappingDisabled = (disabled) => {
+    if (ctx.snapping) ctx.snapping.setDisabled(disabled);
+  };
+
   const updateLabel = () => {
-    const isLocked = ctx.snappingLocked || false;
     label.classList.remove('disabled', 'locked', 'hover-lock', 'hover-unlock');
 
-    if (isLocked) {
-      label.classList.add('locked');
-      if (isHovering) {
-        label.classList.add('hover-unlock');
-        keySpan.textContent = ICON_UNLOCKED;
-      } else {
-        keySpan.textContent = ICON_LOCKED;
-      }
-      if (ctx.snapping) {
-        ctx.snapping.setDisabled(true);
-      }
-    } else if (shiftHeld) {
-      label.classList.add('disabled');
-      if (isHovering) {
-        label.classList.add('hover-lock');
-        keySpan.textContent = ICON_LOCKED;
-      } else {
+    if (ctx.snappingHoldMode) {
+      // Hold mode: snapping locked off, Shift temporarily enables
+      if (shiftHeld) {
+        // Shift held in hold mode = temporarily enabled
         keySpan.textContent = ICON_SHIFT;
-      }
-      if (ctx.snapping) {
-        ctx.snapping.setDisabled(true);
+        if (isHovering) {
+          label.classList.add('hover-unlock');
+          keySpan.textContent = ICON_UNLOCKED;
+        }
+        setSnappingDisabled(false);
+      } else {
+        // Default hold mode state = locked off
+        label.classList.add('locked');
+        if (isHovering) {
+          label.classList.add('hover-unlock');
+          keySpan.textContent = ICON_UNLOCKED;
+        } else {
+          keySpan.textContent = ICON_LOCKED;
+        }
+        setSnappingDisabled(true);
       }
     } else {
-      keySpan.textContent = ICON_SHIFT;
-      if (ctx.snapping) {
-        ctx.snapping.setDisabled(false);
+      // Toggle mode: Shift toggles snapping on/off
+      if (ctx.snappingLocked) {
+        // Toggled off
+        label.classList.add('disabled');
+        if (isHovering) {
+          label.classList.add('hover-lock');
+          keySpan.textContent = ICON_LOCKED;
+        } else {
+          keySpan.textContent = ICON_SHIFT;
+        }
+        setSnappingDisabled(true);
+      } else {
+        // Toggled on (default)
+        keySpan.textContent = ICON_SHIFT;
+        setSnappingDisabled(false);
       }
     }
   };
 
   const keydownHandler = (e) => {
-    if (e.key === 'Shift' && !ctx.snappingLocked) {
-      shiftHeld = true;
+    if (e.key !== 'Shift') return;
+    shiftHeld = true;
+
+    if (ctx.snappingHoldMode) {
+      // Hold mode: Shift temporarily enables snapping
+      updateLabel();
+    } else {
+      // Toggle mode: Shift toggles snapping state
+      ctx.snappingLocked = !ctx.snappingLocked;
       updateLabel();
     }
   };
 
   const keyupHandler = (e) => {
-    if (e.key === 'Shift') {
-      shiftHeld = false;
-      if (!ctx.snappingLocked) {
-        updateLabel();
-      }
+    if (e.key !== 'Shift') return;
+    shiftHeld = false;
+
+    if (ctx.snappingHoldMode) {
+      // Hold mode: releasing Shift re-disables snapping
+      updateLabel();
     }
+    // Toggle mode: do nothing on keyup (it's a toggle, not hold)
   };
 
   const mouseenterHandler = () => {
@@ -546,12 +565,15 @@ export function createSnappingIndicator(ctx, state, options = {}) {
     updateLabel();
   };
 
-  // Click to lock/unlock
   const clickHandler = () => {
-    if (ctx.snappingLocked) {
+    if (ctx.snappingHoldMode) {
+      // In hold mode: click unlocks, return to toggle mode with snapping ON
+      ctx.snappingHoldMode = false;
       ctx.snappingLocked = false;
       updateLabel();
-    } else if (shiftHeld) {
+    } else {
+      // In toggle mode: click locks snapping off, enter hold mode
+      ctx.snappingHoldMode = true;
       ctx.snappingLocked = true;
       updateLabel();
     }
@@ -575,7 +597,6 @@ export function createSnappingIndicator(ctx, state, options = {}) {
   state.snappingMouseleaveHandler = mouseleaveHandler;
   state.snappingCtx = ctx;
 
-  // Initialize display based on persisted lock state
   updateLabel();
 
   return {
@@ -622,7 +643,8 @@ export function removeDistanceAngleUI(state) {
       state.snappingMouseleaveHandler = null;
     }
   }
-  if (state.snappingCtx && state.snappingCtx.snapping && !state.snappingCtx.snappingLocked) {
+  if (state.snappingCtx && state.snappingCtx.snapping &&
+      !state.snappingCtx.snappingLocked && !state.snappingCtx.snappingHoldMode) {
     state.snappingCtx.snapping.setDisabled(false);
   }
   state.snappingCtx = null;

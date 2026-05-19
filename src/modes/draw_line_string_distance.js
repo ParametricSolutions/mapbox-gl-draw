@@ -838,8 +838,7 @@ DrawLineStringDistance.clickOnMap = function (state, e) {
     return;
   }
 
-  // Check if shift is held to bypass snapping
-  const shiftHeld = CommonSelectors.isShiftDown(e);
+  const snappingDisabled = this._ctx.snapping?.disabled;
 
   const prevVertex = state.vertices[state.vertices.length - 1];
 
@@ -854,8 +853,7 @@ DrawLineStringDistance.clickOnMap = function (state, e) {
   if (state.vertices.length === 0) {
     // Use the preview vertex if it exists (from onMouseMove), otherwise calculate it
     let vertexCoord;
-    if (shiftHeld) {
-      // Shift held - use raw mouse position
+    if (snappingDisabled) {
       vertexCoord = [e.lngLat.lng, e.lngLat.lat];
     } else if (state.previewVertex) {
       vertexCoord = state.previewVertex;
@@ -984,8 +982,7 @@ DrawLineStringDistance.clickOnMap = function (state, e) {
   const hasUserDistance =
     state.currentDistance !== null && state.currentDistance > 0;
 
-  // If shift held, use raw mouse position (bypass snapping)
-  if (shiftHeld) {
+  if (snappingDisabled) {
     newVertex = [e.lngLat.lng, e.lngLat.lat];
 
     if (this._ctx.options.validateVertex) {
@@ -1533,9 +1530,8 @@ DrawLineStringDistance.onMouseMove = function (state, e) {
     lastHeavyComputeTime = now;
   }
 
-  // Check if shift is held to temporarily disable snapping
-  const shiftHeld = CommonSelectors.isShiftDown(e);
-  if (shiftHeld && state.vertices.length >= 1) {
+  const snappingDisabled = this._ctx.snapping?.disabled;
+  if (snappingDisabled && state.vertices.length >= 1) {
     // Shift held - use raw mouse position, bypass all snapping
     const lastVertex = state.vertices[state.vertices.length - 1];
     const from = turf.point(lastVertex);

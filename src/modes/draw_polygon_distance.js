@@ -1346,8 +1346,7 @@ DrawPolygonDistance.clickOnMap = function (state, e) {
     return;
   }
 
-  // Check if shift is held to bypass snapping
-  const shiftHeld = CommonSelectors.isShiftDown(e);
+  const snappingDisabled = this._ctx.snapping?.disabled;
 
   const prevVertex = state.vertices[state.vertices.length - 1];
 
@@ -1363,8 +1362,7 @@ DrawPolygonDistance.clickOnMap = function (state, e) {
   if (state.vertices.length === 0) {
     // Use the preview vertex if it exists (from onMouseMove), otherwise calculate it
     let vertexCoord;
-    if (shiftHeld) {
-      // Shift held - use raw mouse position
+    if (snappingDisabled) {
       vertexCoord = [e.lngLat.lng, e.lngLat.lat];
     } else if (state.previewVertex) {
       vertexCoord = state.previewVertex;
@@ -1534,8 +1532,7 @@ DrawPolygonDistance.clickOnMap = function (state, e) {
   const hasUserDistance =
     state.currentDistance !== null && state.currentDistance > 0;
 
-  // If shift held, use raw mouse position (bypass snapping)
-  if (shiftHeld) {
+  if (snappingDisabled) {
     newVertex = [e.lngLat.lng, e.lngLat.lat];
 
     // Check for polygon closing (not in line mode)
@@ -2173,11 +2170,10 @@ DrawPolygonDistance.onMouseMove = function (state, e) {
     lastHeavyComputeTime = now;
   }
 
-  // Check if shift is held to temporarily disable snapping
-  const shiftHeld = CommonSelectors.isShiftDown(e);
+  const snappingDisabled = this._ctx.snapping?.disabled;
   const inRectanglePhase = state.drawingSubMode === DRAWING_SUB_MODES.RECTANGLE && state.vertices.length === 2;
   const inLineOffsetPhase = state.drawingSubMode === DRAWING_SUB_MODES.LINE && state.linePhase === 'offset';
-  if (shiftHeld && state.vertices.length >= 1 && !inRectanglePhase && !inLineOffsetPhase) {
+  if (snappingDisabled && state.vertices.length >= 1 && !inRectanglePhase && !inLineOffsetPhase) {
     // Shift held - use raw mouse position, bypass all snapping
     const lastVertex = state.vertices[state.vertices.length - 1];
     const from = turf.point(lastVertex);
@@ -2223,7 +2219,7 @@ DrawPolygonDistance.onMouseMove = function (state, e) {
 
   // Rectangle mode: constrain to perpendicular after edge is defined
   if (inRectanglePhase) {
-    if (shiftHeld && this._ctx.snapping) {
+    if (snappingDisabled && this._ctx.snapping) {
       this._ctx.snapping.clearSnapCoord();
       this._ctx.snapping.snappedFeature = undefined;
       this._ctx.snapping.snappedGeometry = undefined;
@@ -2234,7 +2230,7 @@ DrawPolygonDistance.onMouseMove = function (state, e) {
 
   // Line mode offset phase: show offset polygon preview
   if (inLineOffsetPhase) {
-    if (shiftHeld && this._ctx.snapping) {
+    if (snappingDisabled && this._ctx.snapping) {
       this._ctx.snapping.clearSnapCoord();
       this._ctx.snapping.snappedFeature = undefined;
       this._ctx.snapping.snappedGeometry = undefined;

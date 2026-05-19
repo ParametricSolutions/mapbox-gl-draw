@@ -1217,13 +1217,13 @@ DirectSelect.onDrag = function (state, e) {
   e.originalEvent.stopPropagation();
   let lngLat = e.lngLat;
 
-  const shiftHeld = isShiftDown(e);
+  const snappingDisabled = this._ctx.snapping?.disabled;
 
   // ============================================================
-  // PRIORITY #1: SHIFT KEY BYPASS (highest priority)
-  // Shift held bypasses ALL snapping including rail constraint
+  // PRIORITY #1: SNAPPING DISABLED BYPASS (highest priority)
+  // Bypasses ALL snapping including rail constraint
   // ============================================================
-  if (shiftHeld) {
+  if (snappingDisabled) {
     if (state.selectedCoordPaths.length === 1) {
       this.removeGuideCircle(state);
       removeAllSnapIndicators(this.map);
@@ -1348,7 +1348,7 @@ DirectSelect.onDrag = function (state, e) {
     // Single vertex dragging - apply snapping following draw_line_string_distance pattern
 
     // Handle extended guideline hover detection (similar to draw_line_string_distance)
-    if (!shiftHeld) {
+    if (!snappingDisabled) {
       const intersectionPointInfo = this.detectHoveredIntersectionPoint(
         state,
         e
